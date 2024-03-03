@@ -1,1 +1,2 @@
-# CMS-155-Project-3
+# CMS-155-Project3
+Authors: Wei Hou, Michael Sleeman, Ethan Eichberger
