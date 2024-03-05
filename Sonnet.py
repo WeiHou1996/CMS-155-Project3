@@ -73,7 +73,7 @@ class Sonnet:
         pass
     
     def buildRhymeDict(self):
-        wordRhymeList = []
+        wordRhymeDict = {}
         for sonnet in self.sonnetList:
 
             # get rhyming pattern
@@ -94,7 +94,30 @@ class Sonnet:
                 for idx in range(len(rhymeList)):
                     if thisChar == rhymeList[idx]:
                         thisList.append(sonnet[idx][-1])
-                wordRhymeList.append(thisList)
+                for idx in range(len(thisList)):
+
+                    # get key and entry for dict
+                    thisKey = thisList[idx]
+                    thisEntry = thisList[0:idx]
+                    for jdx in range(idx+1,len(thisList)):
+                        thisEntry.append(thisList[jdx])
+                    
+                    # check if key already exists
+                    newEntryBool = False
+                    if thisKey in wordRhymeDict.keys():
+                        oldEntry = wordRhymeDict.get(thisKey)
+                        newEntry = oldEntry.copy()
+                        for jdx in range(len(thisEntry)):
+                            if thisEntry[jdx] not in oldEntry:
+                                newEntry.append(thisEntry[jdx])
+                                newEntryBool = True
+                        if newEntryBool:
+                            thisDict = {thisKey:newEntry}
+                            wordRhymeDict.update(thisDict)
+                    else:
+                        thisDict = {thisKey:thisEntry}
+                        wordRhymeDict.update(thisDict)
+        self.wordRhymeDict = wordRhymeDict
         pass
     
     def buildSequenceStr(self):
