@@ -6,6 +6,7 @@ class Sonnet:
         self.sequenceType = sequenceType
         self.sonnetLengthList = [12,13,14,15]
         self.sylDict = sylDict
+        self.punctList = [",",".",":",";","?","!",")"]
 
     def read(self):
 
@@ -15,9 +16,15 @@ class Sonnet:
         # count and store sonnets
         sonnetList = []
         thisSonnet = []
-        sCount = 0
+
+        # create dictionary for punctuation
+        pDict = {}
+        for p in self.punctList:
+            pDict.update({p:0})
+        noPunctCount = 0
 
         # iterate through sonnets
+        sCount = 0
         for x in f:
 
             # determine whether number, line, or blank space
@@ -49,19 +56,28 @@ class Sonnet:
 
                     # modify word
                     cleanBool = False
+                    modBool = False
                     while cleanBool == False:
-                        if word[-1] in [",",".",":",";","?","!",".",")"]:
+                        if word[-1] in self.punctList:
+                            thisP = word[-1]
+                            thisCount = pDict.get(thisP)
+                            pDict.update({thisP:thisCount+1})
                             word = word[:-1]
+                            modBool = True
                         elif word[0] == "(":
                             word = word[1:]
+                            modBool = True
                         elif word[-1] == "'":
-                            if word[-2] in [",",".",":",";","?","!",".",")"]:
+                            if word[-2] in self.punctList:
                                 word = word[:-2]
+                                modBool = True
                             else:
                                 cleanBool = True
                         else:
                             cleanBool = True
                     thisWordList.append(word)
+                    if modBool:
+                        noPunctCount += 1
                 thisSonnet.append(thisWordList.copy())
 
         # handle final sonnet
@@ -69,7 +85,13 @@ class Sonnet:
             sonnetList.append(thisSonnet.copy())
         else:
             raise Exception("Length of sonnet is wrong")
+        
+        # handle blank spaces
+        pDict.update({" ":noPunctCount})
+
+        # store values
         self.sonnetList = sonnetList
+        self.pDict = pDict        
         pass
     
     def buildRhymeDict(self):
