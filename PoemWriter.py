@@ -1,43 +1,47 @@
 import numpy as np
 
-class SonnetWriter:
+class PoemWriter:
     def __init__(self,snClass,hmmClass):
         self.hmmClass = hmmClass
         self.snClass = snClass
+        self.poemStructure = []
 
-    def sample_sonnet(self,seed=None):
+    def write_poem(self,seed=None):
 
         # create random number generator
         rng = np.random.default_rng(seed=seed)
 
         # Sample and convert sentence.
-        sonnetList = []
+        poemList = []
         failBool = False
-        for ldx in range(14):
+        for ldx in range(len(self.poemStructure)):
+            
+            # get number of syllables
+            cTarget = self.poemStructure[ldx]
 
             # get line
-            thisLineList, sylList = self.sample_sonnet_line(rng)
+            thisLineList, sylList = self.write_line(rng,cTarget)
 
             # ensure that line has the right number of syllables
             lineSylCountListMax, lineSylCountListMin = self.countSyllables(thisLineList)
             cMax = sum(lineSylCountListMax)
             cMin = sum(lineSylCountListMin)
-            if cMax == 10 or cMin == 10:
+            if cMax == cTarget or cMin == cTarget:
                 thisLine = " ".join(thisLineList)
                 thisLine = thisLine[0].capitalize() + thisLine[1:]
-                sonnetList.append(thisLine)
+                poemList.append(thisLine)
             else:
                 lineSylCountListMax, lineSylCountListMin = self.countSyllables(thisLineList)
                 failBool = True
                 print("Line has wrong number of syllables")
                 
         if not failBool:
-            for ldx in range(len(sonnetList)):
-                print(sonnetList[ldx])
+            for ldx in range(len(poemList)):
+                print(poemList[ldx])
                 
-        return sonnetList
+        return poemList
 
-    def sample_sonnet_line(self,rng):
+    def write_line(self,rng,cTarget):
         
         # get classes
         hmmClass = self.hmmClass
@@ -47,7 +51,7 @@ class SonnetWriter:
         lineBool = False
         while lineBool == False:
             # get sample emission
-            emission, states = hmmClass.generate_emission(15,rng)
+            emission, states = hmmClass.generate_emission(cTarget,rng)
             thisLine = [snClass.obs_map_r[i] for i in emission]
 
             # count syllables
@@ -57,14 +61,14 @@ class SonnetWriter:
             for wdx in range(len(thisLine)):
 
                 # check if we have enough syllables
-                if sum(lineSylCountListMin) > 10:
+                if sum(lineSylCountListMin) > cTarget:
                     lineBool = False
                     break
-                elif sum(lineSylCountListMin) == 10:
+                elif sum(lineSylCountListMin) == cTarget:
                     lineBool = True
                     lineSylCountList = lineSylCountListMin.copy()
                     break
-                elif sum(lineSylCountListMax) == 10:
+                elif sum(lineSylCountListMax) == cTarget:
                     lineBool = True
                     lineSylCountList = lineSylCountListMax.copy()
                     break
@@ -87,12 +91,12 @@ class SonnetWriter:
                 
                 # get syllable count
                 if eBool:
-                    if sum(lineSylCountListMax) + eCount == 10:
+                    if sum(lineSylCountListMax) + eCount == cTarget:
                         lineSylCountListMax.append(eCount)
                         lineSylCountListMin.append(eCount)
                         lineSylCountList = lineSylCountListMax.copy()
                         
-                    elif sum(lineSylCountListMin) + eCount == 10:
+                    elif sum(lineSylCountListMin) + eCount == cTarget:
                         lineSylCountListMax.append(eCount)
                         lineSylCountListMin.append(eCount)
                         lineSylCountList = lineSylCountListMin.copy()
@@ -142,3 +146,18 @@ class SonnetWriter:
         
         return lineSylCountListMax, lineSylCountListMin
 
+class SonnetWriter(PoemWriter):
+    # Ten lines of 14 syllables
+    def __init__(self,snClass,hmmClass):
+        self.hmmClass = hmmClass
+        self.snClass = snClass
+        self.poemStructure = []
+        for ldx in range(14):
+            self.poemStructure.append(10)
+
+class HaikuWriter(PoemWriter):
+    # Three lines of 5, 7, 5 syllables
+    def __init__(self,snClass,hmmClass):
+        self.hmmClass = hmmClass
+        self.snClass = snClass
+        self.poemStructure = [5,7,5]
