@@ -29,6 +29,8 @@ class PoemWriter:
             if cMax == cTarget or cMin == cTarget:
                 thisLine = " ".join(thisLineList)
                 thisLine = thisLine[0].capitalize() + thisLine[1:]
+                if ldx == len(self.poemStructure)-1 and type(self).__name__ == 'SonnetWriter':
+                    thisLine += "."
                 poemList.append(thisLine)
             else:
                 lineSylCountListMax, lineSylCountListMin = self.countSyllables(thisLineList)
@@ -161,3 +163,54 @@ class HaikuWriter(PoemWriter):
         self.hmmClass = hmmClass
         self.snClass = snClass
         self.poemStructure = [5,7,5]
+
+class SonnetRhymeWrite(SonnetWriter):
+    # Ten lines of 14 syllables
+    # Rhyming is ababcdcdefefgg
+    def __init__(self,snClass,hmmClass):
+        self.hmmClass = hmmClass
+        self.snClass = snClass
+        self.poemStructure = []
+        self.rhymePattern = 'ababcdcdefefgg'
+        for ldx in range(14):
+            self.poemStructure.append(10)
+
+    def write_rhyming_poem(self,seed=None):
+
+        # create random number generator
+        rng = np.random.default_rng(seed=seed)
+
+        # get rhyming words
+        wordRhymeDict = self.snClass.wordRhymeDict
+        rhymeKeys = wordRhymeDict.keys()
+
+        # Sample and convert sentence.
+        poemList = []
+        failBool = False
+        for ldx in range(len(self.poemStructure)):
+            
+            # get number of syllables
+            cTarget = self.poemStructure[ldx]
+
+            # get line
+            thisLineList, sylList = self.write_line(rng,cTarget)
+
+            # ensure that line has the right number of syllables
+            lineSylCountListMax, lineSylCountListMin = self.countSyllables(thisLineList)
+            cMax = sum(lineSylCountListMax)
+            cMin = sum(lineSylCountListMin)
+            if cMax == cTarget or cMin == cTarget:
+                thisLine = " ".join(thisLineList)
+                thisLine = thisLine[0].capitalize() + thisLine[1:]
+                poemList.append(thisLine)
+            else:
+                lineSylCountListMax, lineSylCountListMin = self.countSyllables(thisLineList)
+                failBool = True
+                raise Exception("Line has wrong number of syllables")
+                
+        if not failBool:
+            for ldx in range(len(poemList)):
+                print(poemList[ldx])
+                
+        return poemList
+
