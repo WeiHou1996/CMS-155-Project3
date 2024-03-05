@@ -237,7 +237,7 @@ class Sonnet:
                     # get word and its syllable count
                     word = wordList[wdx]
                     thisCount = lineSylCountList[wdx]
-                    thisObs = word + str(thisCount)
+                    thisObs = word# + str(thisCount)
                     
                     if thisObs not in obs_map:
                         # Add unique words to the observations map.
