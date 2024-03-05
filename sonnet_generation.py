@@ -2,11 +2,8 @@ import numpy as np
 
 def sample_sonnet(hmmClass, snClass, seed = None):
 
-    if seed is None:
-        seed = np.random.randint(0,255)
-
-    # save original seed
-    seed0 = seed
+    # create random number generator
+    rng = np.random.default_rng(seed=seed)
 
     # Sample and convert sentence.
     sonnetList = []
@@ -14,7 +11,7 @@ def sample_sonnet(hmmClass, snClass, seed = None):
     for ldx in range(14):
 
         # get line
-        thisLineList, sylList, seed = sample_sonnet_line(hmmClass, snClass, seed)
+        thisLineList, sylList = sample_sonnet_line(hmmClass, snClass, rng)
 
         # ensure that line has the right number of syllables
         lineSylCountListMax, lineSylCountListMin = countSyllables(snClass,thisLineList)
@@ -33,14 +30,14 @@ def sample_sonnet(hmmClass, snClass, seed = None):
         for ldx in range(len(sonnetList)):
             print(sonnetList[ldx])
             
-    return sonnetList, seed0
+    return sonnetList
 
-def sample_sonnet_line(hmmClass, snClass, seed):
+def sample_sonnet_line(hmmClass, snClass, rng):
     
     lineBool = False
     while lineBool == False:
         # get sample emission
-        emission, states = hmmClass.generate_emission(15,seed)
+        emission, states = hmmClass.generate_emission(15,rng)
         thisLine = [snClass.obs_map_r[i] for i in emission]
 
         # count syllables
@@ -99,12 +96,11 @@ def sample_sonnet_line(hmmClass, snClass, seed):
             else:
                 lineSylCountListMax.append(max(countInt))
                 lineSylCountListMin.append(min(countInt))
-        seed += 1
     
     if len(wordList) != len(lineSylCountList):
         print("Word list and syllable counts have different lengths")
 
-    return wordList, lineSylCountList, seed
+    return wordList, lineSylCountList
 
 def countSyllables(snClass,wordList):
     # count syllables
