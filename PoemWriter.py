@@ -33,7 +33,7 @@ class PoemWriter:
             else:
                 lineSylCountListMax, lineSylCountListMin = self.countSyllables(thisLineList)
                 failBool = True
-                print("Line has wrong number of syllables")
+                raise Exception("Line has wrong number of syllables")
                 
         if not failBool:
             for ldx in range(len(poemList)):
@@ -112,7 +112,7 @@ class PoemWriter:
                     lineSylCountListMin.append(min(countInt))
         
         if len(wordList) != len(lineSylCountList):
-            print("Word list and syllable counts have different lengths")
+            raise Exception("Word list and syllable counts have different lengths")
 
         return wordList, lineSylCountList
 

@@ -37,25 +37,71 @@ class Sonnet:
                 if thisLen in self.sonnetLengthList:
                     sonnetList.append(thisSonnet.copy())
                 else:
-                    print("Length not supported")
+                    raise Exception("Length not supported")
                 sCount += 1
                 thisSonnet = []            
             elif thisWC > 1: # line
                 thisStr = x[0:-1]
                 thisList = thisStr.split()
-                thisSonnet.append(thisList.copy())
+                thisWordList = []
+                for jdx in range(len(thisList)):
+                    word = thisList[jdx].lower()
+
+                    # modify word
+                    cleanBool = False
+                    while cleanBool == False:
+                        if word[-1] in [",",".",":",";","?","!",".",")"]:
+                            word = word[:-1]
+                        elif word[0] == "(":
+                            word = word[1:]
+                        elif word[-1] == "'":
+                            if word[-2] in [",",".",":",";","?","!",".",")"]:
+                                word = word[:-2]
+                            else:
+                                cleanBool = True
+                        else:
+                            cleanBool = True
+                    thisWordList.append(word)
+                thisSonnet.append(thisWordList.copy())
 
         # handle final sonnet
         if len(thisSonnet) in self.sonnetLengthList:
             sonnetList.append(thisSonnet.copy())
+        else:
+            raise Exception("Length of sonnet is wrong")
         self.sonnetList = sonnetList
+        pass
+    
+    def buildRhymeDict(self):
+        wordRhymeList = []
+        for sonnet in self.sonnetList:
+
+            # get rhyming pattern
+            if len(sonnet) == 14:
+                rhymeList = 'ababcdcdefefgg'
+            elif len(sonnet) == 12:
+                rhymeList = 'aabbccddee'
+            elif len(sonnet) == 13:
+                raise Exception("Rhyming pattern not specified")
+            elif len(sonnet) == 15:
+                rhymeList = 'ababacdcdefefgg'
+            else:
+                raise Exception("Length of sonnet not specified properly")
+            
+            rhymeUniqueList = ''.join(set(rhymeList))
+            for thisChar in rhymeUniqueList:
+                thisList = []
+                for idx in range(len(rhymeList)):
+                    if thisChar == rhymeList[idx]:
+                        thisList.append(sonnet[idx][-1])
+                wordRhymeList.append(thisList)
         pass
     
     def buildSequenceStr(self):
         if self.sequenceType == "Stanza":
             self.sequenceStanzaStr()
         else:
-            print("Sequence type not specified")
+            raise Exception("Sequence type not specified")
 
     def sequenceStanzaStr(self):
         """
@@ -81,7 +127,7 @@ class Sonnet:
             elif thisLen == 15:
                 iList = [0,5,9,13,15]
             else:
-                print("Sonnet length not handled properly: ", thisLen)
+                raise Exception("Sonnet length not handled properly: ", thisLen)
             
             # iterate through stanzas
             for idx in range(len(iList)-1):
@@ -118,17 +164,11 @@ class Sonnet:
 
                 # iterate through words in stanza
                 for wdx in range(len(thisStanza[ldx])):
+                    # get word
+                    word = thisStanza[ldx][wdx]
                     
                     # last word in line?
                     endBool = wdx == (len(thisStanza[ldx]) - 1)
-
-                    # get word
-                    word = thisStanza[ldx][wdx].lower()
-                    if endBool and word[-1] == "'":
-                        word = word[0:-1]
-                    if word[-1] in [',','.',':',';','?','!','.']:
-                        word = word[0:-1]
-
                     # get syllable count for word
                     try:
                         thisDict = self.sylDict[word]
@@ -139,12 +179,6 @@ class Sonnet:
                             if word[0] == "'":
                                 modBool = True
                                 word = word[1:]
-                            elif word[0] == "(":
-                                modBool = True
-                                word = word[1:]
-                            elif word[-1] == ")":
-                                modBool = True
-                                word = word[:-1]
                             elif word[-1] == "'":
                                 modBool = True
                                 word = word[:-1]
@@ -157,9 +191,9 @@ class Sonnet:
                                 except:
                                     dictReadFailBool = True
                                 if not modBool:
-                                    print("Failed to read word from dictionary")
+                                    raise Exception("Failed to read word from dictionary")
                             else:
-                                print("Failed to read word from dictionary")
+                                raise Exception("Failed to read word from dictionary")
                             
                     if len(thisDict) == 1:
                         sylCountList = [int(thisDict[0])]
@@ -229,7 +263,7 @@ class Sonnet:
                                 lineSylCountList = lineSylCountListMax.copy()
                                 lineSylCountList[flowerIndexList[0]] = 1
                             else:
-                                print("Problem with syllable count")
+                                raise Exception("Problem with syllable count")
                     
                 # iterate through words in stanza
                 for wdx in range(len(thisStanza[ldx])):
