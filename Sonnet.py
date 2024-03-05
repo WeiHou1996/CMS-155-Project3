@@ -114,6 +114,7 @@ class Sonnet:
             for ldx in range(len(thisStanza)):
                 lineSylCountListMin = []
                 lineSylCountListMax = []
+                wordList = []
 
                 # iterate through words in stanza
                 for wdx in range(len(thisStanza[ldx])):
@@ -175,6 +176,9 @@ class Sonnet:
                             else:
                                 sylCountList.append(int(thisDict[ddx][0]))
 
+                    # save word
+                    wordList.append(word)
+
                     # get syllable count (for line)
                     if len(sylCountList) == 1:
                         sylCount = sylCountList[0]
@@ -231,15 +235,17 @@ class Sonnet:
                 for wdx in range(len(thisStanza[ldx])):
                     
                     # get word and its syllable count
-                    word = thisStanza[ldx][wdx].lower()
-
-                    if word not in obs_map:
+                    word = wordList[wdx]
+                    thisCount = lineSylCountList[wdx]
+                    thisObs = word + str(thisCount)
+                    
+                    if thisObs not in obs_map:
                         # Add unique words to the observations map.
-                        obs_map[word] = obs_counter
+                        obs_map[thisObs] = obs_counter
                         obs_counter += 1
 
                     # Add the encoded word
-                    obs_elem.append(obs_map[word])
+                    obs_elem.append(obs_map[thisObs])
                 
                 # Add the encoded sequence
                 obs.append(obs_elem)
