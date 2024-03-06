@@ -29,7 +29,7 @@ class PoemWriter:
             if cMax == cTarget or cMin == cTarget:
                 thisLine = " ".join(thisLineList)
                 thisLine = thisLine[0].capitalize() + thisLine[1:]
-                if ldx == len(self.poemStructure)-1 and type(self).__name__ == 'SonnetWriter':
+                if ldx == len(self.poemStructure)-1:
                     thisLine += "."
                 poemList.append(thisLine)
             else:
@@ -175,14 +175,29 @@ class SonnetRhymeWrite(SonnetWriter):
         for ldx in range(14):
             self.poemStructure.append(10)
 
-    def write_rhyming_poem(self,seed=None):
+    def write_poem(self,seed=None):
 
         # create random number generator
         rng = np.random.default_rng(seed=seed)
 
         # get rhyming words
         wordRhymeDict = self.snClass.wordRhymeDict
-        rhymeKeys = wordRhymeDict.keys()
+        rhymeKeys = list(wordRhymeDict.keys())
+
+        # randomly choose rhyming words
+        thisR1 = rng.random(7) * (len(rhymeKeys)-1)
+        rList = []
+        for rdx in range(len(thisR1)):
+            # get first word
+            thisInt = int(thisR1[rdx])
+            thisKey = rhymeKeys[thisInt]
+            # get second word
+            thisEntry = wordRhymeDict.get(thisKey)
+            thisR2 = int(rng.random(1) * (len(thisEntry)-1))
+            thisMatch = thisEntry[thisR2]
+            # store pair of rhyming words
+            thisRhyme = [thisKey,thisMatch]
+            rList.append(thisRhyme.copy())
 
         # Sample and convert sentence.
         poemList = []
@@ -191,9 +206,19 @@ class SonnetRhymeWrite(SonnetWriter):
             
             # get number of syllables
             cTarget = self.poemStructure[ldx]
-
+            
+            # get rhyme
+            thisRhymeChar = self.rhymePattern[ldx]
+            charMatches = [xdx for xdx in range(len(self.rhymePattern)) if self.rhymePattern[xdx] == thisRhymeChar]
+            firstBool = charMatches[0] == ldx
+            cdx = ord(thisRhymeChar) - ord('a')
+            if firstBool:
+                lastWord = rList[cdx][0]
+            else:
+                lastWord = rList[cdx][1]
+            
             # get line
-            thisLineList, sylList = self.write_line(rng,cTarget)
+            thisLineList, sylList = self.write_line(rng,cTarget,lastWord)
 
             # ensure that line has the right number of syllables
             lineSylCountListMax, lineSylCountListMin = self.countSyllables(thisLineList)
@@ -213,4 +238,70 @@ class SonnetRhymeWrite(SonnetWriter):
                 print(poemList[ldx])
                 
         return poemList
+    
+    def write_line(self,rng,cTarget,lastWord):
+        
+        # get classes
+        hmmClass = self.hmmClass
+        snClass = self.snClass
 
+        # get last state
+        lastObs = snClass.obs_map.get(lastWord)
+
+        # iterate until appropriate line is written
+        lineBool = False
+        while lineBool == False:
+            # get sample emission
+            emission, states = hmmClass.generate_emission_r(cTarget,lastObs,rng)
+            thisLine = [snClass.obs_map_r[i] for i in emission]
+
+            # count syllables
+            lineSylCountListMin = [0 for _ in range(len(thisLine))]
+            lineSylCountListMax = [0 for _ in range(len(thisLine))]
+            wordList = ['' for _ in range(len(thisLine))]
+            for wdx in range(len(thisLine)-1,0,-1):
+
+                # check if we have enough syllables
+                if sum(lineSylCountListMin) > cTarget:
+                    lineBool = False
+                    break
+                elif sum(lineSylCountListMin) == cTarget:
+                    lineBool = True
+                    lineSylCountList = lineSylCountListMin.copy()
+                    break
+                elif sum(lineSylCountListMax) == cTarget:
+                    lineBool = True
+                    lineSylCountList = lineSylCountListMax.copy()
+                    break
+                word = thisLine[wdx]
+                count = snClass.sylDict[word]
+                if word == "i":
+                    wordList[wdx] = "I"
+                else:
+                    wordList[wdx] = word
+
+                # check for E
+                eBool = False
+                countInt = []
+                for jdx in range(len(count)):
+                    if count[jdx][0] == 'E':
+                        eBool = True
+                        eCount = int(count[jdx][1])
+                    else:
+                        countInt.append(int(count[jdx]))
+                
+                if wdx == len(thisLine) - 1 and eBool:
+                    lineSylCountListMax[wdx] = eCount
+                    lineSylCountListMin[wdx] = eCount
+                else:
+                    lineSylCountListMax[wdx] = max(countInt)
+                    lineSylCountListMin[wdx] = min(countInt)
+        
+        # get rid of unneeded word and syls
+        wordList = wordList[wdx+1:]
+        lineSylCountList = lineSylCountList[wdx+1:]
+
+        if len(wordList) != len(lineSylCountList):
+            raise Exception("Word list and syllable counts have different lengths")
+
+        return wordList, lineSylCountList
