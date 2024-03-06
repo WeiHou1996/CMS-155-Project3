@@ -443,6 +443,74 @@ class HiddenMarkovModel:
                     emission.append(ddx)
 
         return emission, states
+    
+    def generate_emission_r(self, M, lastObs, rng=None):
+        '''
+        Generates an emission of length M, assuming that the starting state
+        is chosen uniformly at random.
+        Arguments:
+            M:          Length of the emission to generate.
+        Returns:
+            emission:   The randomly generated emission as a list.
+            states:     The randomly generated states as a list.
+        '''
+
+        # (Re-)Initialize random number generator
+        if rng is None:
+            rng = np.random.default_rng()
+
+        emission = [np.nan for _ in range(M)]
+        states = [np.nan for _ in range(M)]
+
+        # get array of random numbs
+        randArr = rng.random((M,2))
+
+        # get emission
+        emission[-1] = lastObs
+
+        # assume a uniform prior
+        py = np.ones(self.L) / self.L
+
+        # get p(y|x)
+        pyGx = []
+        for idx in range(self.L):
+            pyGx.append(self.O[idx][lastObs] * py[idx])
+        pyGx_sum1 = np.cumsum(pyGx)
+        pyGx_sum = np.zeros(self.L+1)
+        pyGx_sum[1:] = pyGx_sum1 / np.sum(pyGx)
+        
+        # get states
+        for ldx in range(self.L):
+            if randArr[-1,0] > pyGx_sum[ldx] and randArr[-1,0] <= pyGx_sum[ldx+1]:
+                states[-1] = ldx
+
+        for mdx in range(M-1,0,-1):
+            
+            # get probability of y given next y
+            pyGy = []
+            for idx in range(self.L):
+                pyGy.append(self.A[idx][states[mdx]])
+            pyGy_sum1 = np.cumsum(pyGy)
+            pyGy_sum = np.zeros(self.L+1)
+            pyGy_sum[1:] = pyGy_sum1 / np.sum(pyGy)
+
+            # get states
+            for ldx in range(self.L):
+                if randArr[mdx-1,0] > pyGy_sum[ldx] and randArr[mdx-1,0] <= pyGy_sum[ldx+1]:
+                    states[mdx-1] = ldx
+            
+            # get probabiliy of x given y
+            pxGy = self.O[states[mdx-1]]
+            pxGy_sum1 = np.cumsum(pxGy)
+            pxGy_sum = np.zeros(self.D+1)
+            pxGy_sum[1:] = pxGy_sum1
+
+            # get observation
+            for ddx in range(self.D):
+                if randArr[mdx-1,1] > pxGy_sum[ddx] and randArr[mdx-1,1] <= pxGy_sum[ddx+1]:
+                    emission[mdx-1] = ddx
+
+        return emission, states
 
 
     def probability_alphas(self, x):
