@@ -459,32 +459,8 @@ class SonnetRhymeStressWriter(SonnetRhymeWriter):
         hmmClass = self.hmmClass
         snClass = self.snClass
 
-        # get last state
-        lastObs0 = snClass.obs_map.get(lastWord+"0")
-        lastObs1 = snClass.obs_map.get(lastWord+"1")
-        if not lastObs0 is None:
-            lastObs = lastObs0
-            lastWord = lastWord + "0"
-        elif not lastObs1 is None:
-            lastObs = lastObs1
-            lastWord = lastWord + "1"
-            
-        modBool = True
-        while modBool and lastObs is None:
-            if lastWord[-1] == "'":
-                lastWord = lastWord[:-1]
-                modBool = True
-            elif lastWord[0] == "'":
-                lastWord = lastWord[1:]
-                modBool = True
-            else:
-                modBool = False
-            lastObs = snClass.obs_map.get(lastWord)
-        if lastObs is None:
-            raise Exception("Observation map is incomplete")
-        
         # get syllable count
-        count = snClass.sylDict.get(lastWord[:-1])
+        count = snClass.sylDict.get(lastWord)
         eBool = False
         countList = []
         for thisCount in count:
@@ -494,17 +470,71 @@ class SonnetRhymeStressWriter(SonnetRhymeWriter):
             else:
                 countList.append(int(thisCount[0]))
 
+        stressBool1 = False
+        stressBool0 = False
         if eBool:
-            lastCount = eCount
+            if eCount % 2 == 0:
+                stressBool0 = True
+                lastCount0 = eCount
+            else:
+                stressBool1 = True
+                lastCount1 = eCount
         else:
-            thisR = rng.random(1)
-            pCumSum1 = np.cumsum(np.ones(len(countList)) / len(countList))
-            pCumSum = np.zeros(len(countList)+1)
-            pCumSum[1:] = pCumSum1
-            for jdx in range(len(countList)):
-                if thisR > pCumSum[jdx] and thisR <= pCumSum[jdx+1]:
-                    lastCount = countList[jdx]
+            for jdx in countList:
+                if jdx % 2 == 0:
+                    stressBool0 = True
+                    lastCount0 = int(jdx)
+                else:
+                    stressBool1 = True
+                    lastCount1 = int(jdx)
 
+        # get last obs
+        lastObs1 = snClass.obs_map.get(lastWord+"1")
+        lastObs0 = snClass.obs_map.get(lastWord+"0")
+        modBool = True
+        failBool0 = lastObs0 is None
+        failBool1 = lastObs1 is None
+        while modBool and failBool0 and failBool1:
+            if lastWord[-1] == "'":
+                lastWord = lastWord[:-1]
+                modBool = True
+            elif lastWord[0] == "'":
+                lastWord = lastWord[1:]
+                modBool = True
+            else:
+                modBool = False
+            lastObs1 = snClass.obs_map.get(lastWord+"1")
+            lastObs0 = snClass.obs_map.get(lastWord+"0")
+            failBool0 = lastObs0 is None
+            failBool1 = lastObs1 is None
+        
+        if not lastObs0 is None and stressBool0:
+            stressBool0 = True
+        elif not lastObs1 is None and stressBool1:
+            stressBool1 = True
+        
+        if stressBool1 and stressBool0:
+            thisR = rng.random(1)
+            if thisR > 0.0 and thisR <= 0.5:
+                lastObs = lastObs0
+                lastWord = lastWord + "0"
+                lastCount = lastCount0
+            else:
+                lastObs = lastObs1
+                lastWord = lastWord + "1"
+                lastCount = lastCount1
+        elif stressBool0:
+            lastObs = lastObs0
+            lastWord = lastWord + "0"
+            lastCount = lastCount0
+        elif stressBool1:
+            lastObs = lastObs1
+            lastWord = lastWord + "1"
+            lastCount = lastCount1
+        else:
+            raise Exception("Observation map is incomplete")
+            
+        
         # store word and syllable
         wordList = ["" for _ in range(cTarget)]
         stressList = [np.nan for _ in range(cTarget)]
@@ -512,13 +542,12 @@ class SonnetRhymeStressWriter(SonnetRhymeWriter):
         lineSylCountList = [np.nan for _ in range(cTarget)]
         states = [np.nan for _ in range(cTarget)]
         wordList[-1] = lastWord[:-1]
-        stressList[-1] = lastWord[-1]
+        stressList[-1] = int(lastWord[-1])
         lineSylCountList[-1] = lastCount
         e0 = lastObs
         s0 = None
         wdx = len(wordList) - 1
         
-
         # iterate until appropriate line is written
         lineBool = False        
         while lineBool == False:
@@ -535,7 +564,7 @@ class SonnetRhymeStressWriter(SonnetRhymeWriter):
                 lineSylCountList = [np.nan for _ in range(cTarget)]
                 states = [np.nan for _ in range(cTarget)]
                 wordList[-1] = lastWord[:-1]
-                stressList[-1] = lastWord[-1]
+                stressList[-1] = int(lastWord[-1])
                 lineSylCountList[-1] = lastCount
                 e0 = lastObs
                 s0 = None
@@ -545,16 +574,43 @@ class SonnetRhymeStressWriter(SonnetRhymeWriter):
             wdx -= 1
 
             # should next syllable be stressed?
-            if sum(lineSylCountList) % 2 == 1:
-                stressBool = True
+            thisSum = sum(lineSylCountList[wdx+1:])
+            if np.isnan(thisSum):
+                raise Exception("Error in syllable sum")
+            if thisSum % 2 == 1:
+                endStressBool = True
             else:
-                stressBool = False
+                endStressBool = False
 
             # get sample emission
             appendBool = False
             while not appendBool:
+
+                # get sample word
                 e1, s1 = hmmClass.generate_emission_r(1,e0,s0,rng)
                 thisWord = snClass.obs_map_r[e1[0]]
+
+                # get syllable count
+                count = snClass.sylDict.get(thisWord[:-1])
+                countList = []
+                for thisCount in count:
+                    if not thisCount[0] == 'E':
+                        countList.append(int(thisCount[0]))
+                    
+                # get syllable count
+                thisR = rng.random(1)
+                pCumSum1 = np.cumsum(np.ones(len(countList)) / len(countList))
+                pCumSum = np.zeros(len(countList)+1)
+                pCumSum[1:] = pCumSum1
+                for jdx in range(len(countList)):
+                    if thisR > pCumSum[jdx] and thisR <= pCumSum[jdx+1]:
+                        thisCount = countList[jdx]
+
+                # should start of word be stressed?
+                if thisCount % 2 == 0:
+                    stressBool = endStressBool
+                else:
+                    stressBool = not endStressBool
 
                 # should word be appended?
                 if stressBool and int(thisWord[-1]) == 1:
@@ -566,22 +622,6 @@ class SonnetRhymeStressWriter(SonnetRhymeWriter):
                 
                 if appendBool:
 
-                    # get syllable count
-                    count = snClass.sylDict.get(thisWord[:-1])
-                    countList = []
-                    for thisCount in count:
-                        if not thisCount[0] == 'E':
-                            countList.append(int(thisCount[0]))
-                    
-                    # get syllable count
-                    thisR = rng.random(1)
-                    pCumSum1 = np.cumsum(np.ones(len(countList)) / len(countList))
-                    pCumSum = np.zeros(len(countList)+1)
-                    pCumSum[1:] = pCumSum1
-                    for jdx in range(len(countList)):
-                        if thisR > pCumSum[jdx] and thisR <= pCumSum[jdx+1]:
-                            thisCount = countList[jdx]
-                    
                     lineSylCountList[wdx] = thisCount
                     wordList[wdx] = thisWord[:-1]
                     stressList[wdx] = int(stressBool)
@@ -595,6 +635,22 @@ class SonnetRhymeStressWriter(SonnetRhymeWriter):
         # get rid of unneeded word and syls
         wordList = wordList[wdx:]
         lineSylCountList = lineSylCountList[wdx:]
+        stressList = stressList[wdx:]
+
+        # check stress
+        stressFailBool = False
+        if stressList[0] == 1:
+            stressFailBool = True
+        for wdx in range(1,len(wordList)):
+            if lineSylCountList[wdx-1] % 2 == 0:
+                if stressList[wdx] != stressList[wdx-1]:
+                    stressFailBool = True
+            else:
+                if stressList[wdx] == stressList[wdx-1]:
+                    stressFailBool = True
+        
+        if stressFailBool:
+            raise Exception("Stresses not correct")
 
         if len(wordList) != len(lineSylCountList):
             raise Exception("Word list and syllable counts have different lengths")
