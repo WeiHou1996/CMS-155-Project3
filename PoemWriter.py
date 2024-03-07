@@ -518,3 +518,23 @@ class SonnetRhymeStressWriter(SonnetRhymeWriter):
             raise Exception("Word list and syllable counts have different lengths")
 
         return wordList, lineSylCountList
+    
+class LimerickWriter(SonnetRhymeWriter):
+    # Five lines [9,9,6,6,9]
+    # Rhyming is aabba
+    def __init__(self,snClass,hmmClass):
+        self.hmmClass = hmmClass
+        self.snClass = snClass
+        self.poemStructure = [9,9,6,6,9]
+        self.rhymePattern = 'aabba'
+
+class PetrarchanSonnetWriter(SonnetRhymeWriter):
+    # 14 lines of 11 syllables
+    # Rhyming is abbaabbacdecde
+    def __init__(self,snClass,hmmClass):
+        self.hmmClass = hmmClass
+        self.snClass = snClass
+        self.poemStructure = []
+        self.rhymePattern = 'abbaabbacdecde'
+        for ldx in range(14):
+            self.poemStructure.append(10)
