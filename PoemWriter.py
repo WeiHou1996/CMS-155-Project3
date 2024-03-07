@@ -248,6 +248,21 @@ class SonnetRhymeWrite(SonnetWriter):
         # get last state
         lastObs = snClass.obs_map.get(lastWord)
 
+        modBool = True
+        while modBool and lastObs is None:
+            if lastWord[-1] == "'":
+                lastWord = lastWord[:-1]
+                modBool = True
+            elif lastWord[0] == "'":
+                lastWord = lastWord[1:]
+                modBool = True
+            else:
+                modBool = False
+            lastObs = snClass.obs_map.get(lastWord)
+        if lastObs is None:
+            raise Exception("Observation map is incomplete")
+                
+
         # iterate until appropriate line is written
         lineBool = False
         while lineBool == False:
