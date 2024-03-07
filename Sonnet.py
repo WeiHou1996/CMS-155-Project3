@@ -13,11 +13,11 @@ class Sonnet:
 
         # initialize lists
         self.read()
-        self.buildRhymeDict()
         self.buildSequenceStr()
         self.buildSyllableList()
         self.parse_observations()
         self.obs_map_reverser()
+        self.buildRhymeDict()
 
     def read(self):
 
@@ -107,26 +107,24 @@ class Sonnet:
     
     def buildRhymeDict(self):
         wordRhymeDict = {}
-        for sonnet in self.sonnetList:
+        for thisStanza in self.sequenceListStrMod:
 
             # get rhyming pattern
-            if len(sonnet) == 14:
-                rhymeList = 'ababcdcdefefgg'
-            elif len(sonnet) == 12:
-                rhymeList = 'aabbccddee'
-            elif len(sonnet) == 13:
-                raise Exception("Rhyming pattern not specified")
-            elif len(sonnet) == 15:
-                rhymeList = 'ababacdcdefefgg'
+            if len(thisStanza) == 4:
+                rhymeList = 'abab'
+            elif len(thisStanza) == 2:
+                rhymeList = 'aa'
+            elif len(thisStanza) == 5:
+                rhymeList = 'ababa'
             else:
-                raise Exception("Length of sonnet not specified properly")
+                raise Exception("Length of stanza not specified properly")
             
             rhymeUniqueList = ''.join(set(rhymeList))
             for thisChar in rhymeUniqueList:
                 thisList = []
                 for idx in range(len(rhymeList)):
                     if thisChar == rhymeList[idx]:
-                        thisList.append(sonnet[idx][-1])
+                        thisList.append(thisStanza[idx][-1])
                 for idx in range(len(thisList)):
 
                     # get key and entry for dict
@@ -362,6 +360,8 @@ class Sonnet:
                     
                     # get word and its syllable count
                     word = thisStanza[ldx][wdx]
+                    if word == "i":
+                        word = "I"
                     thisCount = thisStanzaSyl[ldx][wdx]
                     thisObs = word# + str(thisCount)
                     
@@ -403,12 +403,12 @@ class SonnetStress(Sonnet):
 
         # initialize lists
         self.read()
-        self.buildRhymeDict()
         self.buildSequenceStr()
         self.buildSyllableList()
         self.buildStressList()
         self.parse_observations()
         self.obs_map_reverser()
+        self.buildRhymeDict()
 
     def buildStressList(self):
         sequenceStressList = []
@@ -450,6 +450,8 @@ class SonnetStress(Sonnet):
                     
                     # get word and its syllable count
                     word = thisStanza[ldx][wdx]
+                    if word == "i":
+                        word = "I"
                     thisStress = thisStanzaStress[ldx][wdx]
                     thisObs = word + str(int(thisStress))
                     
