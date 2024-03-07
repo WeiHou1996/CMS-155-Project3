@@ -332,26 +332,6 @@ class Sonnet:
         self.sequenceListStrMod = sequenceListStrMod
         pass
     
-    def buildStressList(self):
-        stressList = []
-        for sdx in range(len(self.sequenceListStrMod)):
-            thisStanza = self.sequenceListStrMod[sdx]
-            stressStanza = []
-            for ldx in range(len(thisStanza)):
-                sylCumSum = np.cumsum(self.sequenceSylList[sdx][ldx])
-                thisStress = []
-                for wdx in range(len(thisStanza[ldx])):
-                    if wdx == 0:
-                        thisStress.append(False)
-                    elif sylCumSum[wdx-1] % 2 == 0:
-                        thisStress.append(False)
-                    else:
-                        thisStress.append(True)
-                stressStanza.append(thisStress.copy())
-            stressList.append(stressStanza)
-        self.stressList = stressList
-        pass
-
     def parse_observations(self):
 
         obs_counter = 0
@@ -399,4 +379,65 @@ class Sonnet:
             obs_map_r[self.obs_map[key]] = key
 
         self.obs_map_r = obs_map_r
+        pass
+
+class SonnetStress(Sonnet):
+    def buildStressList(self):
+        sequenceStressList = []
+        for sdx in range(len(self.sequenceListStrMod)):
+            thisStanza = self.sequenceListStrMod[sdx]
+            stressStanza = []
+            for ldx in range(len(thisStanza)):
+                sylCumSum = np.cumsum(self.sequenceSylList[sdx][ldx])
+                thisStress = []
+                for wdx in range(len(thisStanza[ldx])):
+                    if wdx == 0:
+                        thisStress.append(False)
+                    elif sylCumSum[wdx-1] % 2 == 0:
+                        thisStress.append(False)
+                    else:
+                        thisStress.append(True)
+                stressStanza.append(thisStress.copy())
+            sequenceStressList.append(stressStanza)
+        self.sequenceStressList = sequenceStressList
+        pass
+
+    def parse_observations(self):
+
+        obs_counter = 0
+        obs = []
+        obs_map = {}
+
+        # iterate through stanzas
+        for sdx in range(len(self.sequenceListStrMod)):
+            obs_elem = []
+            thisStanza = self.sequenceListStrMod[sdx]
+            thisStanzaStress = self.sequenceStressList[sdx]
+
+            # iterate through lines in stanza
+            for ldx in range(len(thisStanza)):
+                    
+                # iterate through words in stanza
+                for wdx in range(len(thisStanza[ldx])):
+                    
+                    # get word and its syllable count
+                    word = thisStanza[ldx][wdx]
+                    thisStress = thisStanzaStress[ldx][wdx]
+                    thisObs = word + str(int(thisStress))
+                    
+                    if thisObs not in obs_map:
+                        # Add unique words to the observations map.
+                        obs_map[thisObs] = obs_counter
+                        obs_counter += 1
+
+                    # Add the encoded word
+                    obs_elem.append(obs_map[thisObs])
+                
+                # Add the encoded sequence
+                obs.append(obs_elem)
+
+        # store values
+        self.obs = obs
+        self.obs_map = obs_map
+        self.obs_counter = obs_counter
         pass
