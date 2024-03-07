@@ -202,6 +202,9 @@ class Sonnet:
             sylStanza = []
             wordStanza = []
 
+            # keep stanza?
+            discardStanzaBool = False
+
             # iterate through lines in stanza
             for ldx in range(len(thisStanza)):
                 lineSylCountListMin = []
@@ -274,10 +277,9 @@ class Sonnet:
                 elif sum(lineSylCountListMin) == 10:
                     lineSylCountList = lineSylCountListMin.copy()
                 else:
-                    if sum(lineSylCountListMin) > 10:
-                        lineSylCountList = lineSylCountListMin.copy()
-                    elif sum(lineSylCountListMax) < 10:
-                        lineSylCountList = lineSylCountListMax.copy()
+                    if sum(lineSylCountListMin) > 10 or sum(lineSylCountListMax) < 10:
+                        lineSylCountList = []
+                        discardStanzaBool = True
                     else:
                         # count being and whether
                         beingIndexList = []
@@ -311,18 +313,23 @@ class Sonnet:
                         else:
                             raise Exception("Problem with syllable count")
                 
+                # check syllable count
+                if sum(lineSylCountList) != 10:
+                    discardStanzaBool = True
+
                 # store values (by stanza)
                 sylStanza.append(lineSylCountList)
                 wordStanza.append(wordList)
         
             # add values back to sequence
-            sequenceSylList.append(sylStanza)
-            sequenceListStrMod.append(wordStanza)
+            if not discardStanzaBool:
+                sequenceSylList.append(sylStanza)
+                sequenceListStrMod.append(wordStanza)
             
         # add values to class
         self.sequenceSylList = sequenceSylList
         self.sequenceListStrMod = sequenceListStrMod
-        pass    
+        pass
 
     def parse_observations(self):
 
