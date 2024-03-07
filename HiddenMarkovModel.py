@@ -394,7 +394,7 @@ class HiddenMarkovModel:
         pass
 
 
-    def generate_emission(self, M, rng=None):
+    def generate_emission(self, M, rng=None, e0 = None, s0 = None):
         '''
         Generates an emission of length M, assuming that the starting state
         is chosen uniformly at random.
@@ -409,13 +409,20 @@ class HiddenMarkovModel:
         if rng is None:
             rng = np.random.default_rng()
 
-        emission = []
-        states = []
+        if e0 is None and s0 is None:
+            emission = []
+            states = []
+            r0 = range(M)
+        else:
+            emission = [e0]
+            states = [s0]
+            M += 1
+            r0 = range(1,M)
 
         # get array of random numbs
         randArr = rng.random((M,2))
         
-        for mdx in range(M):
+        for mdx in r0:
             
             # get probability of y given y
             if mdx == 0:
