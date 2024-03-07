@@ -363,6 +363,7 @@ class SonnetStressWriter(SonnetWriter):
         s0 = None
         emission = []
         states = []
+        stressList = []
 
         # iterate until appropriate line is written
         lineBool = False
@@ -376,6 +377,7 @@ class SonnetStressWriter(SonnetWriter):
                 s0 = None
                 emission = []
                 states = []
+                stressList = []
             elif sum(lineSylCountList) == cTarget:
                 lineBool = True
                 break
@@ -395,9 +397,9 @@ class SonnetStressWriter(SonnetWriter):
                 thisWord = snClass.obs_map_r[e1[-1]]
 
                 # should we append new word
-                if stressBool and int(thisWord[-1]) == 0:
+                if stressBool and int(thisWord[-1]) == 1:
                     appendBool = True
-                elif not stressBool and int(thisWord[-1]) == 1:
+                elif not stressBool and int(thisWord[-1]) == 0:
                     appendBool = True
                 else:
                     appendBool = False
@@ -409,6 +411,7 @@ class SonnetStressWriter(SonnetWriter):
                     e0 = e1[-1]
                     s0 = s1[-1]
                     wordList.append(thisWord[:-1])
+                    stressList.append(int(thisWord[-1]))
                     count = snClass.sylDict[thisWord[:-1]]
                     if len(count) == 1:
                         lineSylCountList.append(int(count[0]))
@@ -445,11 +448,28 @@ class SonnetStressWriter(SonnetWriter):
                                 lineSylCountList.append(thisCount)
                         else:
                             lineSylCountList.append(thisCount)                      
-                        
-                                    
+
+        # check lengths
         if len(wordList) != len(lineSylCountList):
             raise Exception("Word list and syllable counts have different lengths")
+        if len(wordList) != len(stressList):
+            raise Exception("Word list and stress lists have different lengths")
 
+        # check stress
+        stressFailBool = False
+        if stressList[0] == 1:
+            stressFailBool = True
+        for wdx in range(1,len(wordList)):
+            if lineSylCountList[wdx-1] % 2 == 0:
+                if stressList[wdx] != stressList[wdx-1]:
+                    stressFailBool = True
+            else:
+                if stressList[wdx] == stressList[wdx-1]:
+                    stressFailBool = True
+        
+        if stressFailBool:
+            raise Exception("Stresses not correct")
+        
         return wordList, lineSylCountList
 
 class SonnetRhymeStressWriter(SonnetRhymeWriter):
@@ -637,6 +657,12 @@ class SonnetRhymeStressWriter(SonnetRhymeWriter):
         lineSylCountList = lineSylCountList[wdx:]
         stressList = stressList[wdx:]
 
+        # check lengths
+        if len(wordList) != len(lineSylCountList):
+            raise Exception("Word list and syllable counts have different lengths")
+        if len(wordList) != len(stressList):
+            raise Exception("Word list and stress lists have different lengths")
+
         # check stress
         stressFailBool = False
         if stressList[0] == 1:
@@ -651,10 +677,6 @@ class SonnetRhymeStressWriter(SonnetRhymeWriter):
         
         if stressFailBool:
             raise Exception("Stresses not correct")
-
-        if len(wordList) != len(lineSylCountList):
-            raise Exception("Word list and syllable counts have different lengths")
-
         return wordList, lineSylCountList
     
 class LimerickWriter(SonnetRhymeWriter):
