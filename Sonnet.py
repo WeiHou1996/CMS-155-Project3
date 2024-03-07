@@ -1,4 +1,5 @@
 import re
+import numpy as np
 
 class Sonnet:
     def __init__(self,filename,sequenceType,sylDict):
@@ -329,6 +330,26 @@ class Sonnet:
         # add values to class
         self.sequenceSylList = sequenceSylList
         self.sequenceListStrMod = sequenceListStrMod
+        pass
+    
+    def buildStressList(self):
+        stressList = []
+        for sdx in range(len(self.sequenceListStrMod)):
+            thisStanza = self.sequenceListStrMod[sdx]
+            stressStanza = []
+            for ldx in range(len(thisStanza)):
+                sylCumSum = np.cumsum(self.sequenceSylList[sdx][ldx])
+                thisStress = []
+                for wdx in range(len(thisStanza[ldx])):
+                    if wdx == 0:
+                        thisStress.append(False)
+                    elif sylCumSum[wdx-1] % 2 == 0:
+                        thisStress.append(False)
+                    else:
+                        thisStress.append(True)
+                stressStanza.append(thisStress.copy())
+            stressList.append(stressStanza)
+        self.stressList = stressList
         pass
 
     def parse_observations(self):
