@@ -211,18 +211,19 @@ class SonnetRhymeWriter(SonnetWriter):
         for rdx in range(len(rhymeCountList)):
             # get list of rhyming words
             thisEntry = []
-            while len(thisEntry) <= rhymeCountList[rdx] - 1:
+            while len(thisEntry) < rhymeCountList[rdx] - 1:
                 # get first word
                 thisR1 = rng.random(1) * (len(rhymeKeys)-1)
                 thisInt = int(thisR1)
                 thisKey = rhymeKeys[thisInt]
-                thisEntry = wordRhymeDict.get(thisKey)
+                thisEntry = wordRhymeDict.get(thisKey).copy()
 
             # get subsequent words
             thisRhyme = [thisKey]
             for mdx in range(rhymeCountList[rdx]-1):
-                thisR2 = int(rng.random(1) * (len(thisEntry)-1))
-                thisMatch = thisEntry[thisR2]
+                thisR2 = rng.random(1) * (len(thisEntry)-1)
+                thisInt = int(thisR2)
+                thisMatch = thisEntry[thisInt]
                 thisRhyme.append(thisMatch)
                 thisEntry.remove(thisMatch)
             rList.append(thisRhyme.copy())
