@@ -295,7 +295,7 @@ class SonnetRhymeWriter(SonnetWriter):
         lineBool = False
         while lineBool == False:
             # get sample emission
-            emission, states = hmmClass.generate_emission_r(cTarget,lastObs,rng)
+            emission, states = hmmClass.generate_emission_r(cTarget,lastObs,None,rng)
             thisLine = [snClass.obs_map_r[i] for i in emission]
 
             # count syllables
@@ -460,8 +460,15 @@ class SonnetRhymeStressWriter(SonnetRhymeWriter):
         snClass = self.snClass
 
         # get last state
-        lastObs = snClass.obs_map.get(lastWord)
-
+        lastObs0 = snClass.obs_map.get(lastWord+"0")
+        lastObs1 = snClass.obs_map.get(lastWord+"1")
+        if not lastObs0 is None:
+            lastObs = lastObs0
+            lastWord = lastWord + "0"
+        elif not lastObs1 is None:
+            lastObs = lastObs1
+            lastWord = lastWord + "1"
+            
         modBool = True
         while modBool and lastObs is None:
             if lastWord[-1] == "'":
@@ -475,60 +482,119 @@ class SonnetRhymeStressWriter(SonnetRhymeWriter):
             lastObs = snClass.obs_map.get(lastWord)
         if lastObs is None:
             raise Exception("Observation map is incomplete")
-                
+        
+        # get syllable count
+        count = snClass.sylDict.get(lastWord[:-1])
+        eBool = False
+        countList = []
+        for thisCount in count:
+            if thisCount[0] == 'E':
+                eCount = int(thisCount[1])
+                eBool = True
+            else:
+                countList.append(int(thisCount[0]))
+
+        if eBool:
+            lastCount = eCount
+        else:
+            thisR = rng.random(1)
+            pCumSum1 = np.cumsum(np.ones(len(countList)) / len(countList))
+            pCumSum = np.zeros(len(countList)+1)
+            pCumSum[1:] = pCumSum1
+            for jdx in range(len(countList)):
+                if thisR > pCumSum[jdx] and thisR <= pCumSum[jdx+1]:
+                    lastCount = countList[jdx]
+
+        # store word and syllable
+        wordList = ["" for _ in range(cTarget)]
+        stressList = [np.nan for _ in range(cTarget)]
+        emission = [np.nan for _ in range(cTarget)]
+        lineSylCountList = [np.nan for _ in range(cTarget)]
+        states = [np.nan for _ in range(cTarget)]
+        wordList[-1] = lastWord[:-1]
+        stressList[-1] = lastWord[-1]
+        lineSylCountList[-1] = lastCount
+        e0 = lastObs
+        s0 = None
+        wdx = len(wordList) - 1
+        
 
         # iterate until appropriate line is written
-        lineBool = False
+        lineBool = False        
         while lineBool == False:
-            # get sample emission
-            emission, states = hmmClass.generate_emission_r(cTarget,lastObs,rng)
-            thisLine = [snClass.obs_map_r[i] for i in emission]
-
-            # count syllables
-            lineSylCountListMin = [0 for _ in range(len(thisLine))]
-            lineSylCountListMax = [0 for _ in range(len(thisLine))]
-            wordList = ['' for _ in range(len(thisLine))]
-            for wdx in range(len(thisLine)-1,0,-1):
-
-                # check if we have enough syllables
-                if sum(lineSylCountListMin) > cTarget:
-                    lineBool = False
-                    break
-                elif sum(lineSylCountListMin) == cTarget:
-                    lineBool = True
-                    lineSylCountList = lineSylCountListMin.copy()
-                    break
-                elif sum(lineSylCountListMax) == cTarget:
-                    lineBool = True
-                    lineSylCountList = lineSylCountListMax.copy()
-                    break
-                word = thisLine[wdx]
-                count = snClass.sylDict[word]
-                if word == "i":
-                    wordList[wdx] = "I"
-                else:
-                    wordList[wdx] = word
-
-                # check for E
-                eBool = False
-                countInt = []
-                for jdx in range(len(count)):
-                    if count[jdx][0] == 'E':
-                        eBool = True
-                        eCount = int(count[jdx][1])
-                    else:
-                        countInt.append(int(count[jdx]))
+            
+            # do we have enough syllables?
+            thisSum = sum(lineSylCountList[wdx:])
+            if thisSum == cTarget:
+                lineBool = True
+                break
+            elif thisSum > cTarget:
+                wordList = ["" for _ in range(cTarget)]
+                stressList = [np.nan for _ in range(cTarget)]
+                emission = [np.nan for _ in range(cTarget)]
+                lineSylCountList = [np.nan for _ in range(cTarget)]
+                states = [np.nan for _ in range(cTarget)]
+                wordList[-1] = lastWord[:-1]
+                stressList[-1] = lastWord[-1]
+                lineSylCountList[-1] = lastCount
+                e0 = lastObs
+                s0 = None
+                wdx = len(wordList) - 1
                 
-                if wdx == len(thisLine) - 1 and eBool:
-                    lineSylCountListMax[wdx] = eCount
-                    lineSylCountListMin[wdx] = eCount
+            # update counter
+            wdx -= 1
+
+            # should next syllable be stressed?
+            if sum(lineSylCountList) % 2 == 1:
+                stressBool = True
+            else:
+                stressBool = False
+
+            # get sample emission
+            appendBool = False
+            while not appendBool:
+                e1, s1 = hmmClass.generate_emission_r(1,e0,s0,rng)
+                thisWord = snClass.obs_map_r[e1[0]]
+
+                # should word be appended?
+                if stressBool and int(thisWord[-1]) == 1:
+                    appendBool = True
+                elif not stressBool and int(thisWord[-1]) == 0:
+                    appendBool = True
                 else:
-                    lineSylCountListMax[wdx] = max(countInt)
-                    lineSylCountListMin[wdx] = min(countInt)
-        
+                    appendBool = False
+                
+                if appendBool:
+
+                    # get syllable count
+                    count = snClass.sylDict.get(thisWord[:-1])
+                    countList = []
+                    for thisCount in count:
+                        if not thisCount[0] == 'E':
+                            countList.append(int(thisCount[0]))
+                    
+                    # get syllable count
+                    thisR = rng.random(1)
+                    pCumSum1 = np.cumsum(np.ones(len(countList)) / len(countList))
+                    pCumSum = np.zeros(len(countList)+1)
+                    pCumSum[1:] = pCumSum1
+                    for jdx in range(len(countList)):
+                        if thisR > pCumSum[jdx] and thisR <= pCumSum[jdx+1]:
+                            thisCount = countList[jdx]
+                    
+                    lineSylCountList[wdx] = thisCount
+                    wordList[wdx] = thisWord[:-1]
+                    stressList[wdx] = int(stressBool)
+                    emission[wdx+1] = e1[-1]
+                    states[wdx+1] = s1[-1]
+                    emission[wdx] = e1[0]
+                    states[wdx] = s1[0]
+                    e0 = e1[0]
+                    s0 = s1[0]
+                            
         # get rid of unneeded word and syls
-        wordList = wordList[wdx+1:]
-        lineSylCountList = lineSylCountList[wdx+1:]
+        wordList = wordList[wdx:]
+        lineSylCountList = lineSylCountList[wdx:]
 
         if len(wordList) != len(lineSylCountList):
             raise Exception("Word list and syllable counts have different lengths")
