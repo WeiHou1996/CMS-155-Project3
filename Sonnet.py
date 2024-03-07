@@ -360,6 +360,8 @@ class Sonnet:
                     
                     # get word and its syllable count
                     word = thisStanza[ldx][wdx]
+                    if word == "i":
+                        word = "I"
                     thisCount = thisStanzaSyl[ldx][wdx]
                     thisObs = word# + str(thisCount)
                     
@@ -448,6 +450,8 @@ class SonnetStress(Sonnet):
                     
                     # get word and its syllable count
                     word = thisStanza[ldx][wdx]
+                    if word == "i":
+                        word = "I"
                     thisStress = thisStanzaStress[ldx][wdx]
                     thisObs = word + str(int(thisStress))
                     

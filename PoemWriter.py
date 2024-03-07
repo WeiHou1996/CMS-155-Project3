@@ -11,6 +11,11 @@ class PoemWriter:
         # create random number generator
         rng = np.random.default_rng(seed=seed)
 
+        # include period?
+        perBool1 = type(self).__name__ == 'SonnetWriter'
+        perBool2 = type(self).__name__ == 'SonnetStressWriter'
+        perBool = perBool1 or perBool2
+
         # Sample and convert sentence.
         poemList = []
         failBool = False
@@ -29,7 +34,7 @@ class PoemWriter:
             if cMax == cTarget or cMin == cTarget:
                 thisLine = " ".join(thisLineList)
                 thisLine = thisLine[0].capitalize() + thisLine[1:]
-                if ldx == len(self.poemStructure)-1 and type(self).__name__ == 'SonnetWriter':
+                if ldx == len(self.poemStructure)-1 and perBool:
                     thisLine += "."
                 poemList.append(thisLine)
             else:
