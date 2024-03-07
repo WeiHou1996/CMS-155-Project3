@@ -29,7 +29,7 @@ class PoemWriter:
             if cMax == cTarget or cMin == cTarget:
                 thisLine = " ".join(thisLineList)
                 thisLine = thisLine[0].capitalize() + thisLine[1:]
-                if ldx == len(self.poemStructure)-1:
+                if ldx == len(self.poemStructure)-1 and type(self).__name__ == 'SonnetWriter':
                     thisLine += "."
                 poemList.append(thisLine)
             else:
@@ -44,43 +44,50 @@ class PoemWriter:
         return poemList
 
     def write_line(self,rng,cTarget):
-        
+                
         # get classes
         hmmClass = self.hmmClass
         snClass = self.snClass
 
+        # store word and syllable
+        lineSylCountList = []
+        wordList = []
+        e0 = None
+        s0 = None
+        emission = []
+        states = []
+
         # iterate until appropriate line is written
         lineBool = False
         while lineBool == False:
-            # get sample emission
-            emission, states = hmmClass.generate_emission(cTarget,rng)
-            thisLine = [snClass.obs_map_r[i] for i in emission]
+            
+            # check if we have enough syllables
+            if sum(lineSylCountList) > cTarget or np.isnan(sum(lineSylCountList)):
+                lineSylCountList = []
+                wordList = []
+                e0 = None
+                s0 = None
+                emission = []
+                states = []
+            elif sum(lineSylCountList) == cTarget:
+                lineBool = True
+                break
 
-            # count syllables
-            lineSylCountListMin = []
-            lineSylCountListMax = []
-            wordList = []
-            for wdx in range(len(thisLine)):
 
-                # check if we have enough syllables
-                if sum(lineSylCountListMin) > cTarget:
-                    lineBool = False
-                    break
-                elif sum(lineSylCountListMin) == cTarget:
-                    lineBool = True
-                    lineSylCountList = lineSylCountListMin.copy()
-                    break
-                elif sum(lineSylCountListMax) == cTarget:
-                    lineBool = True
-                    lineSylCountList = lineSylCountListMax.copy()
-                    break
-                word = thisLine[wdx]
-                count = snClass.sylDict[word]
-                if word == "i":
-                    wordList.append("I")
-                else:
-                    wordList.append(word)
+            # generate new word
+            e1, s1 = hmmClass.generate_emission(1,rng,e0,s0)
+            thisWord = snClass.obs_map_r[e1[-1]]
 
+            # append new word
+            emission.append(e1[-1])
+            states.append(s1[-1])
+            e0 = e1[-1]
+            s0 = s1[-1]
+            wordList.append(thisWord)
+            count = snClass.sylDict[thisWord]
+            if len(count) == 1:
+                lineSylCountList.append(int(count[0]))
+            else:
                 # check for E
                 eBool = False
                 countInt = []
@@ -91,28 +98,30 @@ class PoemWriter:
                     else:
                         countInt.append(int(count[jdx]))
                 
-                # get syllable count
-                if eBool:
-                    if sum(lineSylCountListMax) + eCount == cTarget:
-                        lineSylCountListMax.append(eCount)
-                        lineSylCountListMin.append(eCount)
-                        lineSylCountList = lineSylCountListMax.copy()
-                        
-                    elif sum(lineSylCountListMin) + eCount == cTarget:
-                        lineSylCountListMax.append(eCount)
-                        lineSylCountListMin.append(eCount)
-                        lineSylCountList = lineSylCountListMin.copy()
-                    else:
-                        lineSylCountListMax.append(max(countInt))
-                        lineSylCountListMin.append(min(countInt))
-                        if sum(lineSylCountListMin) == 10:
-                            lineSylCountListMin.append(100)
-                        if sum(lineSylCountListMax) == 10:
-                            lineSylCountListMax.append(100)
+                # get thisCount
+                if len(countInt) == 1:
+                    thisCount = countInt[0]
                 else:
-                    lineSylCountListMax.append(max(countInt))
-                    lineSylCountListMin.append(min(countInt))
-        
+                    thisR = rng.random(1)
+                    pCumSum1 = np.cumsum(np.ones(len(countInt)) / len(countInt))
+                    pCumSum = np.zeros(len(countInt)+1)
+                    pCumSum[1:] = pCumSum1
+                    for jdx in range(len(countInt)):
+                        if thisR > pCumSum[jdx] and thisR <= pCumSum[jdx+1]:
+                            thisCount = countInt[jdx]
+                
+                # handle end
+                if eBool:
+                    if sum(lineSylCountList) + eCount == cTarget:
+                        lineSylCountList.append(eCount)
+                    elif sum(lineSylCountList) + thisCount >= cTarget:
+                        lineSylCountList.append(np.nan)
+                    else:
+                        lineSylCountList.append(thisCount)
+                else:
+                    lineSylCountList.append(thisCount)                      
+                        
+                                    
         if len(wordList) != len(lineSylCountList):
             raise Exception("Word list and syllable counts have different lengths")
 
@@ -232,11 +241,14 @@ class SonnetRhymeWriter(SonnetWriter):
                 lineSylCountListMax, lineSylCountListMin = self.countSyllables(thisLineList)
                 failBool = True
                 raise Exception("Line has wrong number of syllables")
-                
+
+        # add a period
+        poemList[-1] += "."
+
         if not failBool:
             for ldx in range(len(poemList)):
                 print(poemList[ldx])
-                
+
         return poemList
     
     def write_line(self,rng,cTarget,lastWord):

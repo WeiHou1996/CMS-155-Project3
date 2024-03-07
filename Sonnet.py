@@ -3,11 +3,21 @@ import numpy as np
 
 class Sonnet:
     def __init__(self,filename,sequenceType,sylDict):
+
+        # initialize vars
         self.filename = filename
         self.sequenceType = sequenceType
         self.sonnetLengthList = [12,13,14,15]
         self.sylDict = sylDict
         self.punctList = [",",".",":",";","?","!",")"]
+
+        # initialize lists
+        self.read()
+        self.buildRhymeDict()
+        self.buildSequenceStr()
+        self.buildSyllableList()
+        self.parse_observations()
+        self.obs_map_reverser()
 
     def read(self):
 
@@ -382,6 +392,24 @@ class Sonnet:
         pass
 
 class SonnetStress(Sonnet):
+    def __init__(self,filename,sequenceType,sylDict):
+
+        # initialize vars
+        self.filename = filename
+        self.sequenceType = sequenceType
+        self.sonnetLengthList = [12,13,14,15]
+        self.sylDict = sylDict
+        self.punctList = [",",".",":",";","?","!",")"]
+
+        # initialize lists
+        self.read()
+        self.buildRhymeDict()
+        self.buildSequenceStr()
+        self.buildSyllableList()
+        self.buildStressList()
+        self.parse_observations()
+        self.obs_map_reverser()
+
     def buildStressList(self):
         sequenceStressList = []
         for sdx in range(len(self.sequenceListStrMod)):
