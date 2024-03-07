@@ -193,19 +193,38 @@ class SonnetRhymeWriter(SonnetWriter):
         wordRhymeDict = self.snClass.wordRhymeDict
         rhymeKeys = list(wordRhymeDict.keys())
 
+        # get number of rhyming words
+        rhymeCountList = []
+        rhymeCharList = []
+        for rdx in range(len(self.rhymePattern)):
+            if self.rhymePattern[rdx] in rhymeCharList:
+                matches = [xdx for xdx in range(len(rhymeCharList)) if rhymeCharList[xdx] == self.rhymePattern[rdx]]
+                if len(matches) != 1:
+                    raise Exception("Rhyming not handled properly")
+                rhymeCountList[matches[0]] += 1
+            else:
+                rhymeCharList.append(self.rhymePattern[rdx])
+                rhymeCountList.append(1)
+
         # randomly choose rhyming words
-        thisR1 = rng.random(7) * (len(rhymeKeys)-1)
         rList = []
-        for rdx in range(len(thisR1)):
-            # get first word
-            thisInt = int(thisR1[rdx])
-            thisKey = rhymeKeys[thisInt]
-            # get second word
-            thisEntry = wordRhymeDict.get(thisKey)
-            thisR2 = int(rng.random(1) * (len(thisEntry)-1))
-            thisMatch = thisEntry[thisR2]
-            # store pair of rhyming words
-            thisRhyme = [thisKey,thisMatch]
+        for rdx in range(len(rhymeCountList)):
+            # get list of rhyming words
+            thisEntry = []
+            while len(thisEntry) <= rhymeCountList[rdx] - 1:
+                # get first word
+                thisR1 = rng.random(1) * (len(rhymeKeys)-1)
+                thisInt = int(thisR1)
+                thisKey = rhymeKeys[thisInt]
+                thisEntry = wordRhymeDict.get(thisKey)
+
+            # get subsequent words
+            thisRhyme = [thisKey]
+            for mdx in range(rhymeCountList[rdx]-1):
+                thisR2 = int(rng.random(1) * (len(thisEntry)-1))
+                thisMatch = thisEntry[thisR2]
+                thisRhyme.append(thisMatch)
+                thisEntry.remove(thisMatch)
             rList.append(thisRhyme.copy())
 
         # Sample and convert sentence.
@@ -218,14 +237,10 @@ class SonnetRhymeWriter(SonnetWriter):
             
             # get rhyme
             thisRhymeChar = self.rhymePattern[ldx]
-            charMatches = [xdx for xdx in range(len(self.rhymePattern)) if self.rhymePattern[xdx] == thisRhymeChar]
-            firstBool = charMatches[0] == ldx
             cdx = ord(thisRhymeChar) - ord('a')
-            if firstBool:
-                lastWord = rList[cdx][0]
-            else:
-                lastWord = rList[cdx][1]
-            
+            lastWord = rList[cdx][0]
+            rList[cdx].remove(lastWord)
+
             # get line
             thisLineList, sylList = self.write_line(rng,cTarget,lastWord)
 
