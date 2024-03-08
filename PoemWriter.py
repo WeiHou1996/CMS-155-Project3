@@ -702,4 +702,4 @@ class PetrarchanSonnetWriter(SonnetRhymeWriter):
         self.poemStructure = []
         self.rhymePattern = 'abbaabbacdecde'
         for ldx in range(14):
-            self.poemStructure.append(10)
+            self.poemStructure.append(11)
