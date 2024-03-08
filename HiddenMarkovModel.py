@@ -394,7 +394,7 @@ class HiddenMarkovModel:
         pass
 
 
-    def generate_emission(self, M, rng=None):
+    def generate_emission(self, M, rng=None, e0 = None, s0 = None):
         '''
         Generates an emission of length M, assuming that the starting state
         is chosen uniformly at random.
@@ -409,13 +409,20 @@ class HiddenMarkovModel:
         if rng is None:
             rng = np.random.default_rng()
 
-        emission = []
-        states = []
+        if e0 is None and s0 is None:
+            emission = []
+            states = []
+            r0 = range(M)
+        else:
+            emission = [e0]
+            states = [s0]
+            M += 1
+            r0 = range(1,M)
 
         # get array of random numbs
         randArr = rng.random((M,2))
         
-        for mdx in range(M):
+        for mdx in r0:
             
             # get probability of y given y
             if mdx == 0:
@@ -441,6 +448,77 @@ class HiddenMarkovModel:
             for ddx in range(self.D):
                 if randArr[mdx,1] > pxy_sum[ddx] and randArr[mdx,1] <= pxy_sum[ddx+1]:
                     emission.append(ddx)
+
+        return emission, states
+    
+    def generate_emission_r(self, M, lastObs, lastState = None, rng=None):
+        '''
+        Generates an emission of length M, assuming that the starting state
+        is chosen uniformly at random.
+        Arguments:
+            M:          Length of the emission to generate.
+        Returns:
+            emission:   The randomly generated emission as a list.
+            states:     The randomly generated states as a list.
+        '''
+
+        # (Re-)Initialize random number generator
+        if rng is None:
+            rng = np.random.default_rng()
+
+        # intialize list
+        emission = [np.nan for _ in range(M+1)]
+        states = [np.nan for _ in range(M+1)]
+
+        # assume a uniform prior
+        py = np.ones(self.L) / self.L
+
+        # generate emission
+        emission[-1] = lastObs
+        if lastState is None:
+            # get p(y|x)
+            pyGx = []
+            for idx in range(self.L):
+                pyGx.append(self.O[idx][lastObs] * py[idx])
+            pyGx_sum1 = np.cumsum(pyGx)
+            pyGx_sum = np.zeros(self.L+1)
+            pyGx_sum[1:] = pyGx_sum1 / np.sum(pyGx)
+            
+            # get states
+            thisR = rng.random(1)
+            for ldx in range(self.L):
+                if thisR > pyGx_sum[ldx] and thisR <= pyGx_sum[ldx+1]:
+                    states[-1] = ldx
+        else:
+            states[-1] = lastState
+        
+        for mdx in range(M,0,-1):
+            
+            # get probability of y given next y
+            pyGy = []
+            for idx in range(self.L):
+                pyGy.append(self.A[idx][states[mdx]])
+            pyGy_sum1 = np.cumsum(pyGy)
+            pyGy_sum = np.zeros(self.L+1)
+            pyGy_sum[1:] = pyGy_sum1 / np.sum(pyGy)
+
+            # get states
+            thisR = rng.random(1)
+            for ldx in range(self.L):
+                if thisR > pyGy_sum[ldx] and thisR <= pyGy_sum[ldx+1]:
+                    states[mdx-1] = ldx
+            
+            # get probabiliy of x given y
+            pxGy = self.O[states[mdx-1]]
+            pxGy_sum1 = np.cumsum(pxGy)
+            pxGy_sum = np.zeros(self.D+1)
+            pxGy_sum[1:] = pxGy_sum1
+
+            # get observation
+            thisR = rng.random(1)
+            for ddx in range(self.D):
+                if thisR > pxGy_sum[ddx] and thisR <= pxGy_sum[ddx+1]:
+                    emission[mdx-1] = ddx
 
         return emission, states
 

@@ -1,12 +1,23 @@
 import re
+import numpy as np
 
 class Sonnet:
     def __init__(self,filename,sequenceType,sylDict):
+
+        # initialize vars
         self.filename = filename
         self.sequenceType = sequenceType
         self.sonnetLengthList = [12,13,14,15]
         self.sylDict = sylDict
         self.punctList = [",",".",":",";","?","!",")"]
+
+        # initialize lists
+        self.read()
+        self.buildSequenceStr()
+        self.buildSyllableList()
+        self.parse_observations()
+        self.obs_map_reverser()
+        self.buildRhymeDict()
 
     def read(self):
 
@@ -96,26 +107,24 @@ class Sonnet:
     
     def buildRhymeDict(self):
         wordRhymeDict = {}
-        for sonnet in self.sonnetList:
+        for thisStanza in self.sequenceListStrMod:
 
             # get rhyming pattern
-            if len(sonnet) == 14:
-                rhymeList = 'ababcdcdefefgg'
-            elif len(sonnet) == 12:
-                rhymeList = 'aabbccddee'
-            elif len(sonnet) == 13:
-                raise Exception("Rhyming pattern not specified")
-            elif len(sonnet) == 15:
-                rhymeList = 'ababacdcdefefgg'
+            if len(thisStanza) == 4:
+                rhymeList = 'abab'
+            elif len(thisStanza) == 2:
+                rhymeList = 'aa'
+            elif len(thisStanza) == 5:
+                rhymeList = 'ababa'
             else:
-                raise Exception("Length of sonnet not specified properly")
+                raise Exception("Length of stanza not specified properly")
             
             rhymeUniqueList = ''.join(set(rhymeList))
             for thisChar in rhymeUniqueList:
                 thisList = []
                 for idx in range(len(rhymeList)):
                     if thisChar == rhymeList[idx]:
-                        thisList.append(sonnet[idx][-1])
+                        thisList.append(thisStanza[idx][-1])
                 for idx in range(len(thisList)):
 
                     # get key and entry for dict
@@ -189,17 +198,21 @@ class Sonnet:
 
         self.sequenceListStr = sequenceList
         pass
-
-    def parse_observations(self):
-
-        obs_counter = 0
-        obs = []
-        obs_map = {}
+    
+    def buildSyllableList(self):
+        
+        # get empty lists
+        sequenceSylList = []
+        sequenceListStrMod = []
 
         # iterate through stanzas
         for sdx in range(len(self.sequenceListStr)):
-            obs_elem = []
             thisStanza = self.sequenceListStr[sdx]
+            sylStanza = []
+            wordStanza = []
+
+            # keep stanza?
+            discardStanzaBool = False
 
             # iterate through lines in stanza
             for ldx in range(len(thisStanza)):
@@ -267,55 +280,89 @@ class Sonnet:
                         lineSylCountListMax.append(max(sylCountList))
                         lineSylCountListMin.append(min(sylCountList))
                     
-                    # check syllable count
-                    if sum(lineSylCountListMax) == 10:
-                        lineSylCountList = lineSylCountListMax.copy()
-                    elif sum(lineSylCountListMin) == 10:
-                        lineSylCountList = lineSylCountListMin.copy()
+                # check syllable count
+                if sum(lineSylCountListMax) == 10:
+                    lineSylCountList = lineSylCountListMax.copy()
+                elif sum(lineSylCountListMin) == 10:
+                    lineSylCountList = lineSylCountListMin.copy()
+                else:
+                    if sum(lineSylCountListMin) > 10 or sum(lineSylCountListMax) < 10:
+                        lineSylCountList = []
+                        discardStanzaBool = True
                     else:
-                        if sum(lineSylCountListMin) > 10:
-                            lineSylCountList = lineSylCountListMin.copy()
-                        elif sum(lineSylCountListMax) < 10:
-                            lineSylCountList = lineSylCountListMax.copy()
-                        else:
-                            # count being and whether
-                            beingIndexList = []
-                            whetherIndexList = []
-                            crownedIndexList = []
-                            flowerIndexList = []
-                            for wdx in range(len(thisStanza[ldx])):
-                                word = re.sub(r'[^\w]', '', thisStanza[ldx][wdx]).lower()
-                                if word == 'being':
-                                    beingIndexList.append(wdx)
-                                elif word == 'whether':
-                                    whetherIndexList.append(wdx)
-                                elif word == 'crowned':
-                                    crownedIndexList.append(wdx)
-                                elif word == 'flowers':
-                                    flowerIndexList.append(wdx)
+                        # count being and whether
+                        beingIndexList = []
+                        whetherIndexList = []
+                        crownedIndexList = []
+                        flowerIndexList = []
+                        for wdx in range(len(thisStanza[ldx])):
+                            word = re.sub(r'[^\w]', '', thisStanza[ldx][wdx]).lower()
+                            if word == 'being':
+                                beingIndexList.append(wdx)
+                            elif word == 'whether':
+                                whetherIndexList.append(wdx)
+                            elif word == 'crowned':
+                                crownedIndexList.append(wdx)
+                            elif word == 'flowers':
+                                flowerIndexList.append(wdx)
 
-                            if len(beingIndexList) in [1,2] and sum(lineSylCountListMax) == 11: # handle being
-                                lineSylCountList = lineSylCountListMax.copy()
-                                lineSylCountList[beingIndexList[0]] = 1
-                            elif len(whetherIndexList) in [1,2] and sum(lineSylCountListMax) == 11: # handle whether
-                                lineSylCountList = lineSylCountListMax.copy()
-                                lineSylCountList[whetherIndexList[0]] = 1
-                            elif len(crownedIndexList) == 1 and len(whetherIndexList) == 1 and len(beingIndexList) == 1 and sum(lineSylCountListMax) == 12:
-                                lineSylCountList = lineSylCountListMax.copy()
-                                lineSylCountList[crownedIndexList[0]] = 1
-                                lineSylCountList[beingIndexList[0]] = 1
-                            elif len(flowerIndexList) in [1,2] and sum(lineSylCountListMax) == 11: # handle flower
-                                lineSylCountList = lineSylCountListMax.copy()
-                                lineSylCountList[flowerIndexList[0]] = 1
-                            else:
-                                raise Exception("Problem with syllable count")
+                        if len(beingIndexList) in [1,2] and sum(lineSylCountListMax) == 11: # handle being
+                            lineSylCountList = lineSylCountListMax.copy()
+                            lineSylCountList[beingIndexList[0]] = 1
+                        elif len(whetherIndexList) in [1,2] and sum(lineSylCountListMax) == 11: # handle whether
+                            lineSylCountList = lineSylCountListMax.copy()
+                            lineSylCountList[whetherIndexList[0]] = 1
+                        elif len(crownedIndexList) == 1 and len(whetherIndexList) == 1 and len(beingIndexList) == 1 and sum(lineSylCountListMax) == 12:
+                            lineSylCountList = lineSylCountListMax.copy()
+                            lineSylCountList[crownedIndexList[0]] = 1
+                            lineSylCountList[beingIndexList[0]] = 1
+                        elif len(flowerIndexList) in [1,2] and sum(lineSylCountListMax) == 11: # handle flower
+                            lineSylCountList = lineSylCountListMax.copy()
+                            lineSylCountList[flowerIndexList[0]] = 1
+                        else:
+                            raise Exception("Problem with syllable count")
+                
+                # check syllable count
+                if sum(lineSylCountList) != 10:
+                    discardStanzaBool = True
+
+                # store values (by stanza)
+                sylStanza.append(lineSylCountList)
+                wordStanza.append(wordList)
+        
+            # add values back to sequence
+            if not discardStanzaBool:
+                sequenceSylList.append(sylStanza)
+                sequenceListStrMod.append(wordStanza)
+            
+        # add values to class
+        self.sequenceSylList = sequenceSylList
+        self.sequenceListStrMod = sequenceListStrMod
+        pass
+    
+    def parse_observations(self):
+
+        obs_counter = 0
+        obs = []
+        obs_map = {}
+
+        # iterate through stanzas
+        for sdx in range(len(self.sequenceListStrMod)):
+            obs_elem = []
+            thisStanza = self.sequenceListStrMod[sdx]
+            thisStanzaSyl = self.sequenceSylList[sdx]
+
+            # iterate through lines in stanza
+            for ldx in range(len(thisStanza)):
                     
                 # iterate through words in stanza
                 for wdx in range(len(thisStanza[ldx])):
                     
                     # get word and its syllable count
-                    word = wordList[wdx]
-                    thisCount = lineSylCountList[wdx]
+                    word = thisStanza[ldx][wdx]
+                    if word == "i":
+                        word = "I"
+                    thisCount = thisStanzaSyl[ldx][wdx]
                     thisObs = word# + str(thisCount)
                     
                     if thisObs not in obs_map:
@@ -342,4 +389,85 @@ class Sonnet:
             obs_map_r[self.obs_map[key]] = key
 
         self.obs_map_r = obs_map_r
+        pass
+
+class SonnetStress(Sonnet):
+    def __init__(self,filename,sequenceType,sylDict):
+
+        # initialize vars
+        self.filename = filename
+        self.sequenceType = sequenceType
+        self.sonnetLengthList = [12,13,14,15]
+        self.sylDict = sylDict
+        self.punctList = [",",".",":",";","?","!",")"]
+
+        # initialize lists
+        self.read()
+        self.buildSequenceStr()
+        self.buildSyllableList()
+        self.buildStressList()
+        self.parse_observations()
+        self.obs_map_reverser()
+        self.buildRhymeDict()
+
+    def buildStressList(self):
+        sequenceStressList = []
+        for sdx in range(len(self.sequenceListStrMod)):
+            thisStanza = self.sequenceListStrMod[sdx]
+            stressStanza = []
+            for ldx in range(len(thisStanza)):
+                sylCumSum = np.cumsum(self.sequenceSylList[sdx][ldx])
+                thisStress = []
+                for wdx in range(len(thisStanza[ldx])):
+                    if wdx == 0:
+                        thisStress.append(False)
+                    elif sylCumSum[wdx-1] % 2 == 0:
+                        thisStress.append(False)
+                    else:
+                        thisStress.append(True)
+                stressStanza.append(thisStress.copy())
+            sequenceStressList.append(stressStanza)
+        self.sequenceStressList = sequenceStressList
+        pass
+
+    def parse_observations(self):
+
+        obs_counter = 0
+        obs = []
+        obs_map = {}
+
+        # iterate through stanzas
+        for sdx in range(len(self.sequenceListStrMod)):
+            obs_elem = []
+            thisStanza = self.sequenceListStrMod[sdx]
+            thisStanzaStress = self.sequenceStressList[sdx]
+
+            # iterate through lines in stanza
+            for ldx in range(len(thisStanza)):
+                    
+                # iterate through words in stanza
+                for wdx in range(len(thisStanza[ldx])):
+                    
+                    # get word and its syllable count
+                    word = thisStanza[ldx][wdx]
+                    if word == "i":
+                        word = "I"
+                    thisStress = thisStanzaStress[ldx][wdx]
+                    thisObs = word + str(int(thisStress))
+                    
+                    if thisObs not in obs_map:
+                        # Add unique words to the observations map.
+                        obs_map[thisObs] = obs_counter
+                        obs_counter += 1
+
+                    # Add the encoded word
+                    obs_elem.append(obs_map[thisObs])
+                
+                # Add the encoded sequence
+                obs.append(obs_elem)
+
+        # store values
+        self.obs = obs
+        self.obs_map = obs_map
+        self.obs_counter = obs_counter
         pass
