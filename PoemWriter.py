@@ -89,7 +89,7 @@ class PoemWriter:
             e0 = e1[-1]
             s0 = s1[-1]
             wordList.append(thisWord)
-            count = snClass.sylDict[thisWord]
+            count = snClass.sylDict[thisWord.lower()]
             if len(count) == 1:
                 lineSylCountList.append(int(count[0]))
             else:
@@ -140,7 +140,7 @@ class PoemWriter:
 
             # get word and count
             word = wordList[wdx].lower()
-            count = self.snClass.sylDict[word]
+            count = self.snClass.sylDict[word.lower()]
             
             # check for E
             eBool = False
@@ -322,7 +322,7 @@ class SonnetRhymeWriter(SonnetWriter):
                     lineSylCountList = lineSylCountListMax.copy()
                     break
                 word = thisLine[wdx]
-                count = snClass.sylDict[word]
+                count = snClass.sylDict[word.lower()]
                 if word == "i":
                     wordList[wdx] = "I"
                 else:
@@ -417,7 +417,7 @@ class SonnetStressWriter(SonnetWriter):
                     s0 = s1[-1]
                     wordList.append(thisWord[:-1])
                     stressList.append(int(thisWord[-1]))
-                    count = snClass.sylDict[thisWord[:-1]]
+                    count = snClass.sylDict[thisWord[:-1].lower()]
                     if len(count) == 1:
                         lineSylCountList.append(int(count[0]))
                     else:
@@ -485,7 +485,7 @@ class SonnetRhymeStressWriter(SonnetRhymeWriter):
         snClass = self.snClass
 
         # get syllable count
-        count = snClass.sylDict.get(lastWord)
+        count = snClass.sylDict.get(lastWord.lower())
         eBool = False
         countList = []
         for thisCount in count:
@@ -616,7 +616,7 @@ class SonnetRhymeStressWriter(SonnetRhymeWriter):
                 thisWord = snClass.obs_map_r[e1[0]]
 
                 # get syllable count
-                count = snClass.sylDict.get(thisWord[:-1])
+                count = snClass.sylDict.get(thisWord[:-1].lower())
                 countList = []
                 for thisCount in count:
                     if not thisCount[0] == 'E':
