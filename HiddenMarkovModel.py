@@ -128,33 +128,24 @@ class HiddenMarkovModel:
         '''
 
         M = len(x)      # Length of sequence.
-        alphas = [[0. for _ in range(self.L)] for _ in range(M+1)]
+        alphas = [[0. for _ in range(self.L)] for _ in range(M + 1)]
 
-        # get first set of alphas
-        for zdx in range(self.L):
-            alphas[0][zdx] = 1;
-            alphas[1][zdx] = self.O[zdx][x[0]] * self.A_start[zdx]
+        for i in range(self.L):
+            alphas[1][i] = self.A_start[i] * self.O[i][x[0]]
 
-        if normalize:
-            for idx in range(2):
-                thisSum = sum(alphas[idx])
-                for jdx in range (self.L):
-                    alphas[idx][jdx] = alphas[idx][jdx] / thisSum
+        for d in range(2, M + 1):
 
-        # get subsequent set of alphas
-        for idx in range(2,M+1):
-            for zdx in range(self.L):
-                thisSum = 0
-                for jdx in range(self.L):
-                    thisSum += alphas[idx-1][jdx] * self.A[jdx][zdx]
-                
-                alphas[idx][zdx] = self.O[zdx][x[idx-1]] * thisSum
-            
+            for curr_state in range(self.L):
+                prob = 0
+                for prev_state in range(self.L):
+                    prob += (self.O[curr_state][x[d-1]] * (alphas[d-1][prev_state] * self.A[prev_state][curr_state]))
+
+                alphas[d][curr_state] = prob
+
             if normalize:
-                thisSum = sum(alphas[idx])
-                for jdx in range(self.L):
-                    alphas[idx][jdx] = alphas[idx][jdx] / thisSum
-                    
+                denom = np.sum(alphas[d])
+                alphas[d] = [alpha/denom for alpha in alphas[d]]
+
 
         return alphas
 
@@ -182,27 +173,25 @@ class HiddenMarkovModel:
         M = len(x)      # Length of sequence.
         betas = [[0. for _ in range(self.L)] for _ in range(M + 1)]
 
-        # handle final row
-        for zdx in range(self.L):
+        for i in range(self.L):
+            betas[M][i] = 1
+
+        for d in range(M - 1, -1, -1):
+
+            for curr_state in range(self.L):
+                prob = 0
+                for next_state in range(self.L):
+                    if d == 0:
+                        prob += (betas[d+1][next_state] * self.A_start[next_state] * self.O[next_state][x[d]])
+                    else:
+                        prob += (betas[d+1][next_state] * self.A[curr_state][next_state] * self.O[next_state][x[d]])
+
+                betas[d][curr_state] = prob
+
             if normalize:
-                betas[M][zdx] = 1 / self.L
-            else:
-                betas[M][zdx] = 1
-        
-        for idx in range(M,0,-1):
-            for zdx in range(self.L):
-                thisSum = 0
-                for jdx in range(self.L):
-                    thisSum += betas[idx][jdx] * self.A[zdx][jdx] * self.O[jdx][x[idx-1]]
-                
-                betas[idx-1][zdx] = thisSum
-            
-            # normalize
-            if normalize:
-                thisSum = sum(betas[idx-1])
-                for jdx in range(self.L):
-                    betas[idx-1][jdx] = betas[idx-1][jdx] / thisSum
-        
+                denom = np.sum(betas[d])
+                betas[d] = [beta/denom for beta in betas[d]]
+
         return betas
 
 
@@ -281,115 +270,53 @@ class HiddenMarkovModel:
                         lists.
             N_iters:    The number of iterations to train on.
         '''
-        # perform N_iters iterations
-        for ndx in range(N_iters):
-            
-            # print iteration
-            print("Iteration: ",ndx+1)
+        oTol = 1e-3
+        aTol = 1e-3
+        for i in range(N_iters):
+            A_numer = np.zeros((self.L, self.L))
+            A_denom = np.zeros((self.L, self.L))
+            O_numer = np.zeros((self.L, self.D))
+            O_denom = np.zeros((self.L, self.D))
 
-            # update alpha and beta
-            alphas = []
-            betas = []
-            for ldx in range(len(X)):
-                alphas.append(self.forward(X[ldx],normalize=True))
-                betas.append(self.backward(X[ldx],normalize=True))
+            for x in X:
+                alphas = self.forward(x, normalize=True)
+                betas = self.backward(x, normalize=True)
+                M = len(x)
 
-            # make a copy of A
-            thisA = []
-            for idx in range(self.L):
-                thisA.append(self.A[idx].copy())
-            
-            # make list of dInSum
-            dInSumList = []
-            for ldx in range(len(X)):
-                thisList = []
-                for idx in range(len(X[ldx])):
-                    dInSum = 0
-                    for pdx in range(self.L):
-                        dInSum += alphas[ldx][idx][pdx] * betas[ldx][idx][pdx]
-                    thisList.append(dInSum)
-                dInSumList.append(thisList.copy())
-            
-            # make list of aInSum
-            aInSumList = []
-            for ldx in range(len(X)):
-                thisList = []
-                for idx in range(len(X[ldx])-1):
-                    aInSum = 0
-                    for pdx in range(self.L):
-                        for odx in range(self.L):
-                            aInSum += alphas[ldx][idx][pdx] * thisA[pdx][odx] * self.O[odx][X[ldx][idx+1]] * betas[ldx][idx+1][odx]
-                    thisList.append(aInSum)
-                aInSumList.append(thisList.copy())
-            
-            # make list of alpha * beta / dIn
-            abList = []
-            for ldx in range(len(X)):
-                listL = []
-                for idx in range(len(X[ldx])):
-                    listI = []
-                    for adx in range(self.L):
-                        listI.append(alphas[ldx][idx][adx] * betas[ldx][idx][adx] / dInSumList[ldx][idx])
-                    listL.append(listI.copy())
-                abList.append(listL)
-            
-            # sum ab over idx
-            abSumList = []
-            for ldx in range(len(X)):
-                thisList = []
-                for adx in range(self.L):
-                    thisSum = 0
-                    for idx in range(len(X[ldx])):
-                        thisSum += abList[ldx][idx][adx]
-                    thisList.append(thisSum)
-                abSumList.append(thisList.copy())
-            
-            # update A
-            for adx in range(self.L):
-                for bdx in range(self.L):
-                    
-                    # sum entries for A
-                    aSum = 0
+                for d in range(1, M + 1):
+                    prob_OAd = np.array([alphas[d][curr_state] * betas[d][curr_state] for curr_state in range(self.L)])
+                    prob_OAd /= np.sum(prob_OAd)
 
-                    # iterate through sequences
-                    for ldx in range(len(X)):
-                        
-                        # compute numerator p(y2=b,y1=a|x)
-                        for idx in range(0,len(X[ldx])-1):
-                            thisProb = alphas[ldx][idx][adx] * thisA[adx][bdx] * self.O[bdx][X[ldx][idx+1]] * betas[ldx][idx+1][bdx]
-                            aSum += thisProb / aInSumList[ldx][idx]
-                    
-                    # update A
-                    self.A[adx][bdx] = aSum / abSumList[ldx][adx]
+                    for curr_state in range(self.L):
+                        O_numer[curr_state][x[d-1]] += prob_OAd[curr_state]
+                        O_denom[curr_state] += prob_OAd[curr_state]
+                        if d != M:
+                            A_denom[curr_state] += prob_OAd[curr_state]
 
-            # update O
-            for wdx in range(self.D):
-                for zdx in range(self.L):
-                    
-                    # sum entries for O
-                    nSum = 0
+                for d in range(1, M):
+                    prob_An = np.array([[alphas[d][curr_state] \
+                                    * self.O[next_state][x[d]] \
+                                    * self.A[curr_state][next_state] \
+                                    * betas[d+1][next_state] \
+                                    for next_state in range(self.L)] \
+                                    for curr_state in range(self.L)])
+                    prob_An /= np.sum(prob_An)
 
-                    # iterate through sequences
-                    for ldx in range(len(X)):
-                        
-                        # iterate through X
-                        for idx in range(len(X[ldx])):
-                            if X[ldx][idx] == wdx:
-                                nSum += abList[ldx][idx][zdx]
-                    
-                    self.O[zdx][wdx] = nSum / abSumList[ldx][zdx]
-            
-            # normalize A
-            for idx in range(self.L):
-                thisSum = sum(self.A[idx])
-                for jdx in range(self.L):
-                    self.A[idx][jdx] /= thisSum
-
-            # normalize O
-            for idx in range(self.L):
-                thisSum = sum(self.O[idx])
-                for jdx in range(self.D):
-                    self.O[idx][jdx] /= thisSum
+                    for curr_state in range(self.L):
+                        for next_state in range(self.L):
+                            A_numer[curr_state][next_state] += prob_An[curr_state][next_state]
+            thisA = A_numer / A_denom
+            thisO = O_numer / O_denom
+            diffA = np.linalg.norm(thisA-self.A)
+            diffO = np.linalg.norm(thisO-self.O)
+            if diffO < oTol and diffA < aTol:
+                print("HMM Training terminates after {:d} iterations".format(i+1))
+                break
+            else:
+                print("HMM Training iteration {:d}".format(i+1))
+                print("A error {:3e}, O error {:3e}".format(diffA,diffO))
+                self.A = A_numer / A_denom
+                self.O = O_numer / O_denom
                     
         pass
 
