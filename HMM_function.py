@@ -1,4 +1,9 @@
 import numpy as np
+from wordcloud import WordCloud
+from matplotlib.animation import FuncAnimation
+import matplotlib.pyplot as plt
+import urllib.request
+from find_rhyme import find_rhymes
 
 
 class HiddenMarkovModel:
@@ -239,10 +244,30 @@ class HiddenMarkovModel:
                     if norm != 0:
                         A_new[i][j] /= norm
 
+            normA = 0
+            for i in range(self.L):
+                for j in range(self.L):
+                    normA += abs(self.A[i][j] - A_new[i][j])
+
+            normA /= self.L * self.L
+
+            normO = 0
+            for i in range(self.L):
+                for j in range(self.D):
+                    normO += abs(self.O[i][j] - O_new[i][j])
+
+            normO /= self.L * self.D
+
+            # print(normO, normA)
+
+            if (normA < 1e-7) and (normO < 1e-7):
+                print(f"Stopped after {it} iterations")
+                return
+
             self.O = O_new
             self.A = A_new
 
-    def generate_emission(self, M, seed=None):
+    def generate_emission(self, M, endings, obs_map, obs_map_r, syllable, seed=None):
         """
         Generates an emission of length M, assuming that the starting state
         is chosen uniformly at random.
@@ -253,34 +278,77 @@ class HiddenMarkovModel:
             states:     The randomly generated states as a list.
         """
 
-        emission = []
-        states = []
+        lines = []
 
-        rng = np.random.default_rng(seed=seed)
-        rints = rng.random(size=(M, 2))
+        for line in range(2):
+            syl = False
+            while syl is False:
+                emission = []
+                states = []
+                rng = np.random.default_rng()
+                rints = rng.random(size=(M, 2))
 
-        y = int((rints[0, 0]) // (1 / self.L))
+                y = int((rints[0, 0]) // (1 / self.L))
 
-        for m in range(M):
-            states.append(y)
+                for m in range(M):
+                    states.append(y)
 
-            x_bin = np.zeros((self.D - 1,))
-            xo = self.O[y]
-            for i in range(self.D - 1):
-                x_bin[i] = xo[i] + x_bin[i - 1]
-            xm = rints[m, 1]
-            x = len(np.where(xm > x_bin)[0])
-            emission.append(x)
+                    x_bin = np.zeros((self.D - 1,))
+                    xo = self.O[y]
+                    for i in range(self.D - 1):
+                        x_bin[i] = xo[i] + x_bin[i - 1]
+                    xm = rints[m, 1]
+                    x = len(np.where(xm > x_bin)[0])
+                    if m == 0:
+                        if line == 0:
+                            num_rhymes = len(find_rhymes(obs_map_r[x], endings))
+                            while num_rhymes < 1:
+                                xm = rng.random()
+                                x = len(np.where(xm > x_bin)[0])
+                                num_rhymes = len(find_rhymes(obs_map_r[x], endings))
+                            x_start = x
+                        elif line == 1:
+                            rhymes = find_rhymes(obs_map_r[x_start], endings)
+                            # print(rhymes, obs_map_r[x_start])
+                            x_bin_new = np.zeros((len(rhymes),))
+                            for j, i in enumerate(rhymes):
+                                idx = obs_map[i]
+                                x_bin_new[j] = xo[idx]
+                            x_bin_new /= sum(x_bin_new)
+                            x_bin_new_total = np.zeros((len(rhymes) - 1,))
+                            for i in range(len(rhymes) - 1):
+                                x_bin_new_total[i] = (
+                                    x_bin_new[i] + x_bin_new_total[i - 1]
+                                )
+                            x_idx = len(np.where(xm > x_bin_new_total)[0])
+                            for j, i in enumerate(rhymes):
+                                if j == x_idx:
+                                    x = obs_map[i]
+                    emission.append(x)
 
-            if m != M - 1:
-                y_bin = np.zeros((self.L - 1,))
-                yo = self.A[y]
-                for i in range(self.L - 1):
-                    y_bin[i] = yo[i] + y_bin[i - 1]
-                ym = rints[m + 1, 0]
-                y = len(np.where(ym > y_bin)[0])
+                    if m != M - 1:
+                        y_bin = np.zeros((self.L - 1,))
+                        yo = self.A[y]
+                        for i in range(self.L - 1):
+                            y_bin[i] = yo[i] + y_bin[i - 1]
+                        ym = rints[m + 1, 0]
+                        y = len(np.where(ym > y_bin)[0])
 
-        return emission, states
+                syl_count = 0
+                sentence = []
+                for i, e in enumerate(emission):
+                    if syl_count == 10:
+                        lines.append(sentence)
+                        syl = True
+                        break
+                    if i != 0:
+                        syl_count += int(syllable[obs_map_r[e]][0])
+                        sentence.append(e)
+                    else:
+                        syl_count += int(syllable[obs_map_r[e]][1])
+                        sentence.append(e)
+
+        return lines, states
 
 
 def unsupervised_HMM(X, n_states, N_iters, seed=None):
@@ -334,20 +402,403 @@ def unsupervised_HMM(X, n_states, N_iters, seed=None):
     return HMM
 
 
-def sample_sentence(hmm, obs_map_r, syllable, n_words=100, seed=None):
-    # Get reverse map.
+def sample_sentence(
+    hmm, obs_map, obs_map_r, syllable, endings, n_syl=10, n_lines=14, seed=None
+):
+    sonnet = []
 
-    # Sample and convert sentence.
-    emission, states = hmm.generate_emission(n_words, seed=seed)
-    sentence = [obs_map_r[i] for i in emission]
+    for n in range(n_lines):
+        # Sample and convert sentence.
+        emissions, states = hmm.generate_emission(
+            n_syl, endings, obs_map, obs_map_r, syllable, seed=seed
+        )
 
-    syl_count = 0
-    for i, s in enumerate(sentence):
-        if i != (len(s) - 1):
-            syl_count += int(syllable[s][0])
-        else:
-            syl_count += int(syllable[s][1])
+        for emission in emissions:
+            sentence = [obs_map_r[i] for i in reversed(emission)]
+            sonnet.append(sentence)
 
-    print(syl_count)
+    return sonnet
 
-    return " ".join(sentence).capitalize()
+
+####################
+# WORDCLOUD FUNCTIONS
+####################
+
+
+def mask():
+    # Parameters.
+    r = 128
+    d = 2 * r + 1
+
+    # Get points in a circle.
+    y, x = np.ogrid[-r : d - r, -r : d - r]
+    circle = x**2 + y**2 <= r**2
+
+    # Create mask.
+    mask = 255 * np.ones((d, d), dtype=np.uint8)
+    mask[circle] = 0
+
+    return mask
+
+
+def text_to_wordcloud(text, max_words=50, title="", show=True):
+    plt.close("all")
+
+    # Generate a wordcloud image.
+    wordcloud = WordCloud(
+        random_state=0, max_words=max_words, background_color="white", mask=mask()
+    ).generate(text)
+
+    # Show the image.
+    if show:
+        plt.imshow(wordcloud, interpolation="bilinear")
+        plt.axis("off")
+        plt.title(title, fontsize=24)
+        plt.show()
+
+    return wordcloud
+
+
+def states_to_wordclouds(
+    hmm,
+    obs_map,
+    obs_map_r,
+    syllable,
+    endings,
+    n_syl=10,
+    n_lines=14,
+    max_words=50,
+    show=True,
+    seed=None,
+):
+    # Initialize.
+    n_states = len(hmm.A)
+    wordclouds = []
+
+    sonnet = []
+
+    for n in range(int(n_lines / 2)):
+        # Sample and convert sentence.
+        emissions, states = hmm.generate_emission(
+            n_syl, endings, obs_map, obs_map_r, syllable, seed=seed
+        )
+
+        for emission in emissions:
+            for i in reversed(emission):
+                sonnet.append(i)
+
+    emission = flatten(sonnet)
+
+    # For each state, get a list of observations that have been emitted
+    # from that state.
+    obs_count = []
+    for i in range(n_states):
+        obs_lst = np.array(emission)[np.where(np.array(states) == i)[0]]
+        obs_count.append(obs_lst)
+
+    # For each state, convert it into a wordcloud.
+    for i in range(n_states):
+        obs_lst = obs_count[i]
+        sentence = [obs_map_r[j] for j in obs_lst]
+        sentence_str = " ".join(sentence)
+
+        try:
+            wordclouds.append(
+                text_to_wordcloud(
+                    sentence_str, max_words=max_words, title="State %d" % i, show=show
+                )
+            )
+        except:
+            pass
+
+    return wordclouds
+
+
+####################
+# HMM VISUALIZATION FUNCTIONS
+####################
+
+
+def visualize_sparsities(hmm, O_max_cols=50000, O_vmax=0.1):
+    plt.close("all")
+    plt.set_cmap("viridis")
+
+    # Visualize sparsity of A.
+    plt.imshow(hmm.A, vmax=1.0)
+    plt.colorbar()
+    plt.title("Sparsity of A matrix")
+    plt.show()
+
+    O_vmax = max(max(hmm.O))
+
+    # Visualize parsity of O.
+    plt.imshow(np.array(hmm.O)[:O_max_cols], vmax=O_vmax, aspect="auto")
+    plt.colorbar()
+    plt.title("Sparsity of O matrix")
+    plt.show()
+
+
+####################
+# HMM ANIMATION FUNCTIONS
+####################
+
+
+def animate_emission(
+    hmm, obs_map, obs_map_r, M=8, height=12, width=12, delay=1, seed=None
+):
+    # Parameters.
+    lim = 1200
+    text_x_offset = 40
+    text_y_offset = 80
+    x_offset = 580
+    y_offset = 520
+    R = 420
+    r = 100
+    arrow_size = 20
+    arrow_p1 = 0.03
+    arrow_p2 = 0.02
+    arrow_p3 = 0.06
+
+    # Initialize.
+    n_states = len(hmm.A)
+    wordclouds = states_to_wordclouds(hmm, obs_map, max_words=20, show=False)
+
+    # Initialize plot.
+    fig, ax = plt.subplots()
+    fig.set_figheight(height)
+    fig.set_figwidth(width)
+    ax.grid("off")
+    plt.axis("off")
+    ax.set_xlim([0, lim])
+    ax.set_ylim([0, lim])
+
+    # Plot each wordcloud.
+    for i, wordcloud in enumerate(wordclouds):
+        x = x_offset + int(R * np.cos(np.pi * 2 * i / n_states))
+        y = y_offset + int(R * np.sin(np.pi * 2 * i / n_states))
+        ax.imshow(
+            wordcloud.to_array(),
+            extent=(x - r, x + r, y - r, y + r),
+            aspect="auto",
+            zorder=-1,
+        )
+
+    # Initialize text.
+    text = ax.text(text_x_offset, lim - text_y_offset, "", fontsize=24)
+
+    # Make the arrows.
+    zorder_mult = n_states**2 * 100
+    arrows = []
+    for i in range(n_states):
+        row = []
+        for j in range(n_states):
+            # Arrow coordinates.
+            x_i = x_offset + R * np.cos(np.pi * 2 * i / n_states)
+            y_i = y_offset + R * np.sin(np.pi * 2 * i / n_states)
+            x_j = x_offset + R * np.cos(np.pi * 2 * j / n_states)
+            y_j = y_offset + R * np.sin(np.pi * 2 * j / n_states)
+
+            dx = x_j - x_i
+            dy = y_j - y_i
+            d = np.sqrt(dx**2 + dy**2)
+
+            if i != j:
+                arrow = ax.arrow(
+                    x_i + (r / d + arrow_p1) * dx + arrow_p2 * dy,
+                    y_i + (r / d + arrow_p1) * dy + arrow_p2 * dx,
+                    (1 - 2 * r / d - arrow_p3) * dx,
+                    (1 - 2 * r / d - arrow_p3) * dy,
+                    color=(1 - hmm.A[i][j],) * 3,
+                    head_width=arrow_size,
+                    head_length=arrow_size,
+                    zorder=int(hmm.A[i][j] * zorder_mult),
+                )
+            else:
+                arrow = ax.arrow(
+                    x_i,
+                    y_i,
+                    0,
+                    0,
+                    color=(1 - hmm.A[i][j],) * 3,
+                    head_width=arrow_size,
+                    head_length=arrow_size,
+                    zorder=int(hmm.A[i][j] * zorder_mult),
+                )
+
+            row.append(arrow)
+        arrows.append(row)
+
+    emission, states = hmm.generate_emission(M, seed=seed)
+
+    def animate(i):
+        if i >= delay:
+            i -= delay
+
+            if i == 0:
+                arrows[states[0]][states[0]].set_color("red")
+            elif i == 1:
+                arrows[states[0]][states[0]].set_color(
+                    (1 - hmm.A[states[0]][states[0]],) * 3
+                )
+                arrows[states[i - 1]][states[i]].set_color("red")
+            else:
+                arrows[states[i - 2]][states[i - 1]].set_color(
+                    (1 - hmm.A[states[i - 2]][states[i - 1]],) * 3
+                )
+                arrows[states[i - 1]][states[i]].set_color("red")
+
+            # Set text.
+            text.set_text(
+                " ".join([obs_map_r[e] for e in emission][: i + 1]).capitalize()
+            )
+
+            return arrows + [text]
+
+    # Animate!
+    print("\nAnimating...")
+    anim = FuncAnimation(fig, animate, frames=M + delay, interval=1000)
+
+    return anim
+
+
+class Utility:
+    """
+    Utility for the problem files.
+    """
+
+    def __init__():
+        pass
+
+    @staticmethod
+    def load_sequence(n):
+        """
+        Load the file 'sequence_data<n>.txt' for a given n.
+        Arguments:
+            n:          Sequence index.
+        Returns:
+            A:          The transition matrix.
+            O:          The observation matrix.
+            seqs:       Input sequences.
+        """
+        A = []
+        O = []
+        seqs = []
+
+        # For each file:
+        with urllib.request.urlopen(
+            f"https://caltech-cs155.s3.us-east-2.amazonaws.com/sets/set6/data/sequence_data{n}.txt"
+        ) as f:
+            # Read the parameters.
+            L, D = [int(x) for x in f.readline().decode("utf-8").strip().split("\t")]
+
+            # Read the transition matrix.
+            for i in range(L):
+                A.append(
+                    [float(x) for x in f.readline().decode("utf-8").strip().split("\t")]
+                )
+
+            # Read the observation matrix.
+            for i in range(L):
+                O.append(
+                    [float(x) for x in f.readline().decode("utf-8").strip().split("\t")]
+                )
+
+            # The rest of the file consists of sequences.
+            while True:
+                seq = f.readline().decode("utf-8").strip()
+                if seq == "":
+                    break
+                seqs.append([int(x) for x in seq])
+
+        return A, O, seqs
+
+    @staticmethod
+    def load_ron():
+        """
+        Loads the file 'ron.txt'.
+        Returns:
+            moods:      Sequnces of states, i.e. a list of lists.
+                        Each sequence represents half a year of data.
+            mood_map:   A hash map that maps each state to an integer.
+            genres:     Sequences of observations, i.e. a list of lists.
+                        Each sequence represents half a year of data.
+            genre_map:  A hash map that maps each observation to an integer.
+        """
+        moods = []
+        mood_map = {}
+        genres = []
+        genre_map = {}
+        mood_counter = 0
+        genre_counter = 0
+
+        with urllib.request.urlopen(
+            "https://caltech-cs155.s3.us-east-2.amazonaws.com/sets/set6/data/ron.txt"
+        ) as f:
+            mood_seq = []
+            genre_seq = []
+
+            while True:
+                line = f.readline().decode("utf-8").strip()
+
+                if line == "" or line == "-":
+                    # A half year has passed. Add the current sequence to
+                    # the list of sequences.
+                    moods.append(mood_seq)
+                    genres.append(genre_seq)
+                    # Start new sequences.
+                    mood_seq = []
+                    genre_seq = []
+
+                if line == "":
+                    break
+                elif line == "-":
+                    continue
+
+                mood, genre = line.split()
+
+                # Add new moods to the mood state hash map.
+                if mood not in mood_map:
+                    mood_map[mood] = mood_counter
+                    mood_counter += 1
+
+                mood_seq.append(mood_map[mood])
+
+                # Add new genres to the genre observation hash map.
+                if genre not in genre_map:
+                    genre_map[genre] = genre_counter
+                    genre_counter += 1
+
+                # Convert the genre into an integer.
+                genre_seq.append(genre_map[genre])
+
+        return moods, mood_map, genres, genre_map
+
+    @staticmethod
+    def load_ron_hidden():
+        """
+        Loads the file 'ron.txt' and hides the states.
+        Returns:
+            genres:     The observations.
+            genre_map:  A hash map that maps each observation to an integer.
+        """
+        moods, mood_map, genres, genre_map = Utility.load_ron()
+
+        return genres, genre_map
+
+
+def flatten(lst: any) -> any:
+    flattened_list = []
+    for item in lst:
+        flattened_list.append(item)
+    return flattened_list
+
+
+def state_top_words(hmm, obs_map_r, n_words=10):
+    for state, O_row in enumerate(hmm.O):
+        O_row = np.array(O_row)
+        top_words = np.argpartition(O_row, -n_words)[-n_words:]
+        s = []
+        for w in top_words:
+            s.append(obs_map_r[w])
+        print(f"State: {state}")
+        print(", ".join(s).capitalize())
